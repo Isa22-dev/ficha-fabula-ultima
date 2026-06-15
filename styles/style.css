@@ -647,6 +647,45 @@ select:focus {
   color: var(--cyan);
 }
 
+.attribute-roll-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(var(--theme-rgb), 0.08);
+}
+
+.mini-die {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-weight: 900;
+  background: conic-gradient(from 45deg, var(--purple), var(--cyan), var(--purple-dark), var(--red), var(--purple));
+  box-shadow: 0 10px 28px rgba(var(--theme-rgb), 0.28);
+}
+
+.mini-die.rolling {
+  animation: diceThrow 0.8s cubic-bezier(0.2, 0.7, 0.1, 1) infinite;
+}
+
+.mini-die.critico {
+  box-shadow: 0 0 24px rgba(var(--accent-rgb), 0.75);
+}
+
+.mini-die.falha {
+  box-shadow: 0 0 24px rgba(255, 70, 85, 0.75);
+}
+
+.attribute-roll-result small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
 .edit-card {
   display: grid;
   gap: 12px;

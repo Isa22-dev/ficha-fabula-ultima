@@ -119,6 +119,10 @@ function renderStaticControls() {
         ${diceTypes.map((die) => `<option value="d${die}">d${die}</option>`).join("")}
       </select>
       <button type="button" class="ghost-button mini-roll" data-roll-attribute="${attr}"><i class="ti ti-dice"></i>Rolar</button>
+      <div class="attribute-roll-result" id="attrRoll${attr}">
+        <div class="mini-die d8"><span>?</span></div>
+        <small>Resultado</small>
+      </div>
     </article>
   `).join("");
 
@@ -142,7 +146,10 @@ function bindEvents() {
       state.recursos[target.dataset.resource][target.dataset.prop] = Number(target.value || 0);
       renderResources();
     }
-    if (target.dataset.attribute) state.atributos[target.dataset.attribute] = target.value;
+    if (target.dataset.attribute) {
+      state.atributos[target.dataset.attribute] = target.value;
+      renderAttributeRollPlaceholder(target.dataset.attribute);
+    }
     markDirty();
   });
 
@@ -177,7 +184,7 @@ function bindEvents() {
     const themeOption = event.target.closest("[data-theme-option]");
     if (remove) removeItem(remove.dataset.remove, Number(remove.dataset.index));
     if (roll) rollDie(Number(roll.dataset.die));
-    if (attrRoll) rollDie(Number(state.atributos[attrRoll.dataset.rollAttribute].replace("d", "")), attrRoll.dataset.rollAttribute);
+    if (attrRoll) rolarAtributo(attrRoll.dataset.rollAttribute);
     if (themeOption) {
       setTheme(themeOption.dataset.themeOption);
       closeThemeMenu();
@@ -212,6 +219,7 @@ function hydrateForm() {
   });
   $$("[data-attribute]").forEach((select) => {
     select.value = state.atributos[select.dataset.attribute];
+    renderAttributeRollPlaceholder(select.dataset.attribute);
   });
   renderProfilePhoto();
 }
@@ -224,6 +232,13 @@ function renderAll() {
   renderRollHistory();
   renderProfilePhoto();
   renderPreview();
+}
+
+function renderAttributeRollPlaceholder(attr) {
+  const target = $(`#attrRoll${attr}`);
+  if (!target) return;
+  const sides = Number(state.atributos[attr].replace("d", ""));
+  target.innerHTML = `<div class="mini-die d${sides}"><span>?</span></div><small>D${sides}</small>`;
 }
 
 function renderProfilePhoto() {
@@ -573,34 +588,48 @@ function fromRow(row) {
 }
 
 function rollDie(sides, label = "") {
-  const die = $("#dieVisual");
-  const number = $("#dieNumber");
-  const result = $("#diceResult");
-  const detail = $("#diceDetail");
-  die.className = `die d${sides} rolling`;
-  result.textContent = `Rolando ${label ? `${label} ` : ""}D${sides}`;
-  detail.textContent = diceName(sides);
+  return new Promise((resolve) => {
+    const die = $("#dieVisual");
+    const number = $("#dieNumber");
+    const result = $("#diceResult");
+    const detail = $("#diceDetail");
+    die.className = `die d${sides} rolling`;
+    result.textContent = `Rolando ${label ? `${label} ` : ""}D${sides}`;
+    detail.textContent = diceName(sides);
 
-  let ticks = 0;
-  const interval = setInterval(() => {
-    number.textContent = Math.ceil(Math.random() * sides);
-    ticks += 1;
-    if (ticks > 18) {
-      clearInterval(interval);
-      const final = Math.ceil(Math.random() * sides);
-      const status = final === sides ? "critico" : final === 1 ? "falha" : "normal";
-      number.textContent = final;
-      die.classList.remove("rolling");
-      die.classList.toggle("critical", status === "critico");
-      die.classList.toggle("failure", status === "falha");
-      result.textContent = `${label ? `${label}: ` : ""}${final}`;
-      detail.textContent = status === "critico" ? "Critico luminoso." : status === "falha" ? "Falha detectada." : `Resultado D${sides}.`;
-      state.rolagens.unshift({ dado: `D${sides}`, label, resultado: final, status, horario: new Date().toLocaleTimeString("pt-BR") });
-      state.rolagens = state.rolagens.slice(0, 20);
-      renderRollHistory();
-      markDirty();
-    }
-  }, 70);
+    let ticks = 0;
+    const interval = setInterval(() => {
+      number.textContent = Math.ceil(Math.random() * sides);
+      ticks += 1;
+      if (ticks > 18) {
+        clearInterval(interval);
+        const final = Math.ceil(Math.random() * sides);
+        const status = final === sides ? "critico" : final === 1 ? "falha" : "normal";
+        number.textContent = final;
+        die.classList.remove("rolling");
+        die.classList.toggle("critical", status === "critico");
+        die.classList.toggle("failure", status === "falha");
+        result.textContent = `${label ? `${label}: ` : ""}${final}`;
+        detail.textContent = status === "critico" ? "Critico luminoso." : status === "falha" ? "Falha detectada." : `Resultado D${sides}.`;
+        state.rolagens.unshift({ dado: `D${sides}`, label, resultado: final, status, horario: new Date().toLocaleTimeString("pt-BR") });
+        state.rolagens = state.rolagens.slice(0, 20);
+        renderRollHistory();
+        markDirty();
+        resolve({ sides, final, status, label });
+      }
+    }, 70);
+  });
+}
+
+async function rolarAtributo(attr) {
+  const sides = Number(state.atributos[attr].replace("d", ""));
+  const target = $(`#attrRoll${attr}`);
+  target.innerHTML = `<div class="mini-die d${sides} rolling"><span>?</span></div><small>Rolando D${sides}</small>`;
+  const roll = await rollDie(sides, attr);
+  target.innerHTML = `
+    <div class="mini-die d${sides} ${roll.status}"><span>${roll.final}</span></div>
+    <small>${roll.status === "critico" ? "Critico" : roll.status === "falha" ? "Falha" : `D${sides}`}</small>
+  `;
 }
 
 function renderRollHistory() {
