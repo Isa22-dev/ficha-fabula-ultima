@@ -16,15 +16,6 @@ const bondTypes = {
   Aliado: "#9b5de5",
   Neutro: "#8d95b7"
 };
-const themeNames = {
-  purple: "Roxo",
-  red: "Vermelho",
-  orange: "Laranja",
-  green: "Verde",
-  blue: "Azul",
-  light: "Claro"
-};
-
 const defaultSheet = () => ({
   id: null,
   nome: "",
@@ -679,12 +670,12 @@ function toast(message, type = "success") {
 }
 
 function applySavedTheme() {
-  setTheme(localStorage.getItem(themeKey) || "purple", false);
+  const savedTheme = localStorage.getItem(themeKey);
+  setTheme(savedTheme === "light" ? "light-purple" : savedTheme || "purple", false);
 }
 
 function setTheme(theme, persist = true) {
   document.body.dataset.theme = theme;
-  $("#themeLabel").textContent = themeNames[theme] || "Temas";
   $$("[data-theme-option]").forEach((button) => {
     button.classList.toggle("active", button.dataset.themeOption === theme);
   });
