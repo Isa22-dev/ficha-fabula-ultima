@@ -60,6 +60,8 @@ let autosaveTimer = null;
 let isDirty = false;
 let remoteSaveEnabled = true;
 let schemaWarningShown = false;
+let isSaving = false;
+let pendingSave = false;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -150,8 +152,8 @@ function bindEvents() {
   });
   $("#signupBtn").addEventListener("click", signup);
   $("#logoutBtn").addEventListener("click", logout);
-  $("#saveBtn")?.addEventListener("click", salvarFicha);
-  $("#saveBtnTop").addEventListener("click", salvarFicha);
+  $("#saveBtn")?.addEventListener("click", () => salvarFicha());
+  $("#saveBtnTop").addEventListener("click", () => salvarFicha());
   $("#newSheetBtn").addEventListener("click", novaFicha);
   $("#newSheetBtnSettings").addEventListener("click", novaFicha);
   $("#loadSelectedBtn").addEventListener("click", () => carregarFichaSupabase($("#sheetSelect").value));
@@ -379,22 +381,46 @@ async function refreshAuthState() {
   await listarFichas();
 }
 
-async function salvarFicha() {
-  if (!user) return toast("Entre para salvar online.", "danger");
+async function salvarFicha(options = {}) {
+  const silent = options.silent === true;
+  if (!user) {
+    if (!silent) toast("Entre para salvar online.", "danger");
+    return;
+  }
+  if (isSaving) {
+    pendingSave = true;
+    return;
+  }
+  isSaving = true;
   remoteSaveEnabled = true;
-  setLoading(true);
-  const payload = toPayload();
-  const request = state.id
-    ? db.from("fichas_rpg").update(payload).eq("id", state.id).select().single()
-    : db.from("fichas_rpg").insert(payload).select().single();
-  const { data, error } = await request;
-  setLoading(false);
-  if (error) return handleSupabaseError(error);
-  state.id = data.id;
-  isDirty = false;
-  await listarFichas();
-  $("#sheetSelect").value = state.id;
-  toast("Ficha salva.");
+  if (!silent) setLoading(true);
+
+  try {
+    const payload = toPayload();
+    const request = state.id
+      ? db.from("fichas_rpg").update(payload).eq("id", state.id).select("id").single()
+      : db.from("fichas_rpg").insert(payload).select("id").single();
+    const { data, error } = await request;
+    if (error) return handleSupabaseError(error, !silent);
+    state.id = data.id;
+    isDirty = false;
+    if (!silent) {
+      await listarFichas();
+      $("#sheetSelect").value = state.id;
+      toast("Ficha salva.");
+    }
+  } catch (error) {
+    if (!silent) toast("Nao foi possivel salvar agora.", "danger");
+  } finally {
+    if (!silent) setLoading(false);
+    isSaving = false;
+    if (pendingSave && isDirty && remoteSaveEnabled) {
+      pendingSave = false;
+      salvarFicha({ silent: true });
+    } else {
+      pendingSave = false;
+    }
+  }
 }
 
 async function salvarFichaSupabase() {
@@ -657,16 +683,39 @@ function importarFotoPerfil(event) {
     event.target.value = "";
     return;
   }
-  const reader = new FileReader();
-  reader.onload = () => {
-    state.retrato = reader.result;
+  comprimirFotoPerfil(file).then((dataUrl) => {
+    state.retrato = dataUrl;
     const input = document.querySelector('[data-field="retrato"]');
     if (input) input.value = state.retrato;
     renderProfilePhoto();
     markDirty();
     toast("Foto adicionada ao perfil.");
-  };
-  reader.readAsDataURL(file);
+  }).catch(() => toast("Nao foi possivel processar a imagem.", "danger"));
+}
+
+function comprimirFotoPerfil(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = reject;
+      image.onload = () => {
+        const maxSide = 1200;
+        const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        context.drawImage(image, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function removerFotoPerfil() {
@@ -685,8 +734,8 @@ function markDirty() {
   renderPreview();
   clearTimeout(autosaveTimer);
   autosaveTimer = setTimeout(() => {
-    if (isDirty && user && remoteSaveEnabled) salvarFicha();
-  }, 2200);
+    if (isDirty && user && remoteSaveEnabled) salvarFicha({ silent: true });
+  }, 900);
 }
 
 function saveLocalBackup() {
