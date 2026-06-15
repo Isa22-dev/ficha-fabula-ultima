@@ -276,6 +276,36 @@ label,
   grid-column: span 2;
 }
 
+.profile-photo-panel {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.profile-photo-panel img {
+  width: 132px;
+  height: 132px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(5, 7, 16, 0.72);
+}
+
+.profile-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.profile-photo-actions strong {
+  flex-basis: 100%;
+}
+
 label {
   display: grid;
   gap: 7px;
@@ -723,6 +753,11 @@ select:focus {
 
   .span-2 {
     grid-column: span 1;
+  }
+
+  .profile-photo-panel {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .preview-hero img {

@@ -124,6 +124,7 @@ function bindEvents() {
   $("#sheetForm").addEventListener("input", (event) => {
     const target = event.target;
     if (target.dataset.field) setField(target.dataset.field, target.value);
+    if (target.dataset.field === "retrato") renderProfilePhoto();
     if (target.dataset.list) {
       state[target.dataset.list][Number(target.dataset.index)][target.dataset.key] = target.value;
       if (target.dataset.list === "lacos" && target.dataset.key === "tipo") renderBonds();
@@ -151,6 +152,8 @@ function bindEvents() {
   $("#resetBtn").addEventListener("click", resetarFicha);
   $("#exportBtn").addEventListener("click", exportarJSON);
   $("#importInput").addEventListener("change", importarJSON);
+  $("#profilePhotoInput").addEventListener("change", importarFotoPerfil);
+  $("#removePhotoBtn").addEventListener("click", removerFotoPerfil);
   $("#themeToggle").addEventListener("click", toggleTheme);
   $("#sheetSelect").addEventListener("change", () => carregarFicha($("#sheetSelect").value));
   $("#addMemory").addEventListener("click", addMemory);
@@ -193,6 +196,7 @@ function hydrateForm() {
   $$("[data-attribute]").forEach((select) => {
     select.value = state.atributos[select.dataset.attribute];
   });
+  renderProfilePhoto();
 }
 
 function renderAll() {
@@ -201,7 +205,14 @@ function renderAll() {
   renderEquipment();
   renderBonds();
   renderRollHistory();
+  renderProfilePhoto();
   renderPreview();
+}
+
+function renderProfilePhoto() {
+  const preview = $("#profilePhotoPreview");
+  if (!preview) return;
+  preview.src = state.retrato || "assets/images/portrait-placeholder.svg";
 }
 
 function renderResources() {
@@ -578,6 +589,40 @@ function importarJSON(event) {
     toast("JSON importado.");
   };
   reader.readAsText(file);
+}
+
+function importarFotoPerfil(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    toast("Escolha um arquivo de imagem.", "danger");
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    toast("Use uma imagem de ate 2 MB.", "danger");
+    event.target.value = "";
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    state.retrato = reader.result;
+    const input = document.querySelector('[data-field="retrato"]');
+    if (input) input.value = state.retrato;
+    renderProfilePhoto();
+    markDirty();
+    toast("Foto adicionada ao perfil.");
+  };
+  reader.readAsDataURL(file);
+}
+
+function removerFotoPerfil() {
+  state.retrato = "";
+  const input = document.querySelector('[data-field="retrato"]');
+  if (input) input.value = "";
+  $("#profilePhotoInput").value = "";
+  renderProfilePhoto();
+  markDirty();
+  toast("Foto removida.");
 }
 
 function markDirty() {

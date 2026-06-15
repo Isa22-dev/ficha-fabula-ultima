@@ -76,6 +76,14 @@
               </div>
             </div>
             <div class="identity-grid">
+              <div class="profile-photo-panel span-2">
+                <img id="profilePhotoPreview" src="assets/images/portrait-placeholder.svg" alt="Foto do perfil" />
+                <div class="profile-photo-actions">
+                  <strong>Foto do perfil</strong>
+                  <label class="file-button"><i class="ti ti-camera-plus"></i>Adicionar foto<input type="file" id="profilePhotoInput" accept="image/*" /></label>
+                  <button class="ghost-button" type="button" id="removePhotoBtn"><i class="ti ti-photo-x"></i>Remover foto</button>
+                </div>
+              </div>
               <label>Nome<input data-field="nome" placeholder="Nome do heroi" /></label>
               <label>Nivel<input type="number" min="1" data-field="nivel" /></label>
               <label>Classe<input data-field="classe" /></label>
@@ -84,7 +92,7 @@
               <label>Idade<input data-field="idade" /></label>
               <label>Altura<input data-field="altura" /></label>
               <label>Peso<input data-field="peso" /></label>
-              <label>Retrato URL<input data-field="retrato" placeholder="https://..." /></label>
+              <label>Retrato URL<input data-field="retrato" placeholder="https://... ou imagem enviada" /></label>
               <label>Pecado<input data-field="pecado" /></label>
               <label class="span-2">Aparencia<textarea data-field="aparencia"></textarea></label>
               <label class="span-2">Historico<textarea data-field="historico"></textarea></label>
