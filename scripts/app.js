@@ -223,7 +223,7 @@ function renderMemories() {
       <label>Custo<input value="${escapeHtml(item.custo)}" data-list="memorias" data-index="${index}" data-key="custo" /></label>
       <label>Descricao<textarea data-list="memorias" data-index="${index}" data-key="descricao">${escapeHtml(item.descricao)}</textarea></label>
     </article>
-  `).join("") || skeleton("Nenhuma memoria registrada.");
+  `).join("") || skeleton("Nenhuma habilidade registrada.");
 }
 
 function renderEquipment() {
@@ -549,7 +549,7 @@ function renderPreview() {
       ${attributes.map((attr) => `<div><span>${attr}</span><strong>${state.atributos[attr]}</strong></div>`).join("")}
     </div>
     <div class="preview-columns">
-      <section><h3>Memorias</h3>${state.memorias.map((m) => `<p><strong>${escapeHtml(m.codigo)} ${escapeHtml(m.titulo)}</strong><br>${escapeHtml(m.descricao)}</p>`).join("") || "<p>Nenhuma memoria.</p>"}</section>
+      <section><h3>Habilidades</h3>${state.memorias.map((m) => `<p><strong>${escapeHtml(m.codigo)} ${escapeHtml(m.titulo)}</strong><br>${escapeHtml(m.descricao)}</p>`).join("") || "<p>Nenhuma habilidade.</p>"}</section>
       <section><h3>Equipamentos</h3>${state.equipamentos.map((e) => `<p><strong>${escapeHtml(e.nome)}</strong><br>${escapeHtml(e.descricao)} ${escapeHtml(e.bonus)}</p>`).join("") || "<p>Nenhum equipamento.</p>"}</section>
       <section><h3>Lacos</h3>${state.lacos.map((l) => `<p><strong>${escapeHtml(l.nome)}</strong> - ${escapeHtml(l.tipo)}<br>${escapeHtml(l.notas)}</p>`).join("") || "<p>Nenhum laco.</p>"}</section>
     </div>

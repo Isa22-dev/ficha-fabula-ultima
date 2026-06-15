@@ -42,7 +42,7 @@ vercel.json
 - Cadastro com email e senha
 - Login e logout com Supabase Auth
 - Cada usuario acessa apenas suas proprias fichas
-- Identidade, recursos, atributos, memorias, equipamentos, lacos, dados, visualizacao e configuracoes
+- Identidade, recursos, atributos, habilidades, equipamentos, lacos, dados, visualizacao e configuracoes
 - Salvamento principal no Supabase
 - Backup temporario local apenas como apoio
 - Exportar e importar JSON
