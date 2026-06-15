@@ -652,8 +652,8 @@ function importarFotoPerfil(event) {
     toast("Escolha um arquivo de imagem.", "danger");
     return;
   }
-  if (file.size > 2 * 1024 * 1024) {
-    toast("Use uma imagem de ate 2 MB.", "danger");
+  if (file.size > 5 * 1024 * 1024) {
+    toast("Use uma imagem de ate 5 MB.", "danger");
     event.target.value = "";
     return;
   }
