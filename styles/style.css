@@ -759,6 +759,23 @@ select:focus {
   overflow: auto;
 }
 
+.roll-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.roll-history-head h3 {
+  margin: 0;
+}
+
+.roll-history-head .ghost-button {
+  min-height: 34px;
+  padding: 0 10px;
+}
+
 .roll-item {
   display: flex;
   justify-content: space-between;

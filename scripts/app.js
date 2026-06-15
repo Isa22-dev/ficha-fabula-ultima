@@ -166,6 +166,7 @@ function bindEvents() {
   $("#addMemory").addEventListener("click", addMemory);
   $("#addEquipment").addEventListener("click", addEquipment);
   $("#addBond").addEventListener("click", addBond);
+  $("#clearRollHistory").addEventListener("click", limparHistoricoDados);
 
   document.addEventListener("click", (event) => {
     const remove = event.target.closest("[data-remove]");
@@ -583,6 +584,18 @@ function renderRollHistory() {
       <span>${roll.dado} - ${roll.horario}</span>
     </div>
   `).join("") || skeleton("Sem rolagens ainda.");
+}
+
+function limparHistoricoDados() {
+  if (!state.rolagens.length) {
+    toast("Historico de dados ja esta vazio.");
+    return;
+  }
+  if (!confirm("Limpar todo o historico de rolagens?")) return;
+  state.rolagens = [];
+  renderRollHistory();
+  markDirty();
+  toast("Historico de dados limpo.");
 }
 
 function renderPreview() {
