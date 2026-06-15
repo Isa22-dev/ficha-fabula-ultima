@@ -675,20 +675,76 @@ function renderPreview() {
   $("#previewSheet").innerHTML = `
     <div class="preview-hero">
       <img src="${escapeHtml(portrait)}" alt="Retrato do personagem" onerror="this.src='assets/images/portrait-placeholder.svg'" />
-      <div>
+      <div class="preview-identity">
         <p class="eyebrow">Nivel ${state.nivel || 1}</p>
         <h2>${escapeHtml(state.nome || "Personagem sem nome")}</h2>
-        <p>${escapeHtml(state.classe || "Classe indefinida")} - ${escapeHtml(state.tema || "Tema")} - ${escapeHtml(state.origem || "Origem")}</p>
+        <p>${escapeHtml(state.classe || "Classe indefinida")}</p>
+        <div class="preview-tags">
+          <span>${escapeHtml(state.tema || "Tema")}</span>
+          <span>${escapeHtml(state.origem || "Origem")}</span>
+          <span>${escapeHtml(state.pecado || "Pecado")}</span>
+        </div>
       </div>
     </div>
-    <div class="preview-grid">
-      ${resources.map(({ key, label }) => `<div><span>${label}</span><strong>${state.recursos[key].atual}/${state.recursos[key].maximo}</strong></div>`).join("")}
-      ${attributes.map((attr) => `<div><span>${attr}</span><strong>${state.atributos[attr]}</strong></div>`).join("")}
-    </div>
-    <div class="preview-columns">
-      <section><h3>Habilidades</h3>${state.memorias.map((m) => `<p><strong>${escapeHtml(m.codigo)} ${escapeHtml(m.titulo)}</strong><br>${escapeHtml(m.descricao)}</p>`).join("") || "<p>Nenhuma habilidade.</p>"}</section>
-      <section><h3>Equipamentos</h3>${state.equipamentos.map((e) => `<p><strong>${escapeHtml(e.nome)}</strong><br>${escapeHtml(e.descricao)} ${escapeHtml(e.bonus)}</p>`).join("") || "<p>Nenhum equipamento.</p>"}</section>
-      <section><h3>Lacos</h3>${state.lacos.map((l) => `<p><strong>${escapeHtml(l.nome)}</strong> - ${escapeHtml(l.tipo)}<br>${escapeHtml(l.notas)}</p>`).join("") || "<p>Nenhum laco.</p>"}</section>
+    <div class="preview-body">
+      <section class="preview-panel">
+        <h3>Recursos</h3>
+        <div class="preview-stat-grid">
+          ${resources.map(({ key, label }) => `<div><span>${label}</span><strong>${state.recursos[key].atual}/${state.recursos[key].maximo}</strong></div>`).join("")}
+        </div>
+      </section>
+      <section class="preview-panel">
+        <h3>Atributos</h3>
+        <div class="preview-attribute-row">
+          ${attributes.map((attr) => `<div><strong>${attr}</strong><span>${state.atributos[attr]}</span></div>`).join("")}
+        </div>
+      </section>
+      <section class="preview-panel">
+        <h3>Combate</h3>
+        <div class="preview-stat-grid">
+          <div><span>Defesa</span><strong>${state.combate.defesa}</strong></div>
+          <div><span>Def. Magica</span><strong>${state.combate.defesaMagica}</strong></div>
+          <div><span>Iniciativa</span><strong>${state.combate.iniciativa}</strong></div>
+        </div>
+        <p class="preview-note">${escapeHtml(state.combate.condicoes || "Sem condicoes ativas.")}</p>
+      </section>
+      <section class="preview-panel wide">
+        <h3>Habilidades</h3>
+        <div class="preview-list">${state.memorias.map((m) => `
+          <article>
+            <header><strong>${escapeHtml(m.codigo || "HAB")}</strong><span>${escapeHtml(m.custo || "Sem custo")}</span></header>
+            <h4>${escapeHtml(m.titulo || "Habilidade sem titulo")}</h4>
+            <p>${escapeHtml(m.habilidade || "")}</p>
+            <small>${escapeHtml(m.descricao || "Sem descricao.")}</small>
+          </article>
+        `).join("") || "<p>Nenhuma habilidade.</p>"}</div>
+      </section>
+      <section class="preview-panel">
+        <h3>Equipamentos</h3>
+        <div class="preview-list compact">${state.equipamentos.map((e) => `
+          <article>
+            <header><strong>${escapeHtml(e.nome || "Item")}</strong><span>${escapeHtml(e.bonus || "")}</span></header>
+            <small>${escapeHtml(e.descricao || "Sem descricao.")}</small>
+          </article>
+        `).join("") || "<p>Nenhum equipamento.</p>"}</div>
+      </section>
+      <section class="preview-panel">
+        <h3>Lacos</h3>
+        <div class="preview-list compact">${state.lacos.map((l) => `
+          <article class="preview-bond" style="--bond:${bondTypes[l.tipo] || bondTypes.Neutro}">
+            <header><strong>${escapeHtml(l.nome || "Laco")}</strong><span>${escapeHtml(l.tipo || "Neutro")}</span></header>
+            <small>${escapeHtml(l.notas || "Sem notas.")}</small>
+          </article>
+        `).join("") || "<p>Nenhum laco.</p>"}</div>
+      </section>
+      <section class="preview-panel wide">
+        <h3>Notas do personagem</h3>
+        <div class="preview-notes">
+          <p><strong>Aparencia</strong>${escapeHtml(state.aparencia || "Nao definida.")}</p>
+          <p><strong>Historico</strong>${escapeHtml(state.historico || "Nao definido.")}</p>
+          <p><strong>Alerta</strong>${escapeHtml(state.alerta || "Nenhum alerta.")}</p>
+        </div>
+      </section>
     </div>
   `;
 }
