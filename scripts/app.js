@@ -1,5 +1,6 @@
 const db = window.supabaseClient;
 const backupKey = "ficha-fabula-ultima-backup";
+const themeKey = "ficha-fabula-ultima-theme";
 
 const diceTypes = [4, 6, 8, 10, 12, 20];
 const attributes = ["DES", "VIG", "AST", "VON"];
@@ -68,6 +69,7 @@ async function init() {
   bindNavigation();
   renderStaticControls();
   bindEvents();
+  applySavedTheme();
   setLoading(true);
   const { data } = await db.auth.getSession();
   user = data.session?.user || null;
@@ -154,7 +156,7 @@ function bindEvents() {
   $("#importInput")?.addEventListener("change", importarJSON);
   $("#profilePhotoInput").addEventListener("change", importarFotoPerfil);
   $("#removePhotoBtn").addEventListener("click", removerFotoPerfil);
-  $("#themeToggle").addEventListener("click", toggleTheme);
+  $("#themeSelect").addEventListener("change", (event) => setTheme(event.target.value));
   $("#sheetSelect").addEventListener("change", () => carregarFicha($("#sheetSelect").value));
   $("#addMemory").addEventListener("click", addMemory);
   $("#addEquipment").addEventListener("click", addEquipment);
@@ -661,8 +663,15 @@ function toast(message, type = "success") {
   setTimeout(() => item.remove(), 3600);
 }
 
-function toggleTheme() {
-  document.body.classList.toggle("soft-mode");
+function applySavedTheme() {
+  setTheme(localStorage.getItem(themeKey) || "purple", false);
+}
+
+function setTheme(theme, persist = true) {
+  document.body.dataset.theme = theme;
+  const select = $("#themeSelect");
+  if (select) select.value = theme;
+  if (persist) localStorage.setItem(themeKey, theme);
 }
 
 function skeleton(text) {
