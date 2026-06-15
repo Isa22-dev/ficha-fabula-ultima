@@ -58,6 +58,8 @@ let state = defaultSheet();
 let user = null;
 let autosaveTimer = null;
 let isDirty = false;
+let remoteSaveEnabled = true;
+let schemaWarningShown = false;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -378,6 +380,7 @@ async function refreshAuthState() {
 
 async function salvarFicha() {
   if (!user) return toast("Entre para salvar online.", "danger");
+  remoteSaveEnabled = true;
   setLoading(true);
   const payload = toPayload();
   const request = state.id
@@ -385,7 +388,7 @@ async function salvarFicha() {
     : db.from("fichas_rpg").insert(payload).select().single();
   const { data, error } = await request;
   setLoading(false);
-  if (error) return toast(error.message, "danger");
+  if (error) return handleSupabaseError(error);
   state.id = data.id;
   isDirty = false;
   await listarFichas();
@@ -402,7 +405,7 @@ async function carregarFicha(id) {
   setLoading(true);
   const { data, error } = await db.from("fichas_rpg").select("*").eq("id", id).single();
   setLoading(false);
-  if (error) return toast(error.message, "danger");
+  if (error) return handleSupabaseError(error);
   state = fromRow(data);
   hydrateForm();
   renderAll();
@@ -428,7 +431,7 @@ async function excluirFicha() {
   setLoading(true);
   const { error } = await db.from("fichas_rpg").delete().eq("id", state.id);
   setLoading(false);
-  if (error) return toast(error.message, "danger");
+  if (error) return handleSupabaseError(error);
   state = defaultSheet();
   hydrateForm();
   renderAll();
@@ -446,7 +449,7 @@ async function listarFichas() {
   select.innerHTML = `<option value="">Fichas salvas</option>`;
   if (!user) return;
   const { data, error } = await db.from("fichas_rpg").select("id,nome,classe,nivel").order("updated_at", { ascending: false });
-  if (error) return toast(error.message, "danger");
+  if (error) return handleSupabaseError(error, false);
   select.innerHTML += data.map((sheet) => `<option value="${sheet.id}">${escapeHtml(sheet.nome || "Sem nome")} - Nv ${sheet.nivel || 1}</option>`).join("");
 }
 
@@ -669,7 +672,7 @@ function markDirty() {
   renderPreview();
   clearTimeout(autosaveTimer);
   autosaveTimer = setTimeout(() => {
-    if (isDirty && user) salvarFicha();
+    if (isDirty && user && remoteSaveEnabled) salvarFicha();
   }, 2200);
 }
 
@@ -697,6 +700,34 @@ function toast(message, type = "success") {
   item.textContent = message;
   $("#toastStack").appendChild(item);
   setTimeout(() => item.remove(), 3600);
+}
+
+function handleSupabaseError(error, showToast = true) {
+  setLoading(false);
+  const message = supabaseErrorMessage(error);
+  if (isMissingTableError(error)) {
+    remoteSaveEnabled = false;
+    const select = $("#sheetSelect");
+    if (select) select.innerHTML = `<option value="">Execute o SQL do Supabase</option>`;
+    if (!schemaWarningShown && showToast) {
+      schemaWarningShown = true;
+      toast(message, "danger");
+    }
+    return;
+  }
+  if (showToast) toast(message, "danger");
+}
+
+function isMissingTableError(error) {
+  const message = `${error?.message || ""} ${error?.details || ""} ${error?.code || ""}`.toLowerCase();
+  return message.includes("fichas_rpg") && (message.includes("schema cache") || message.includes("could not find") || message.includes("pgrst205"));
+}
+
+function supabaseErrorMessage(error) {
+  if (isMissingTableError(error)) {
+    return "Tabela fichas_rpg nao encontrada. Execute sql/supabase.sql no SQL Editor do Supabase.";
+  }
+  return error?.message || "Erro ao acessar o Supabase.";
 }
 
 function authErrorMessage(error) {
