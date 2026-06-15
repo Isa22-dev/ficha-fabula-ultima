@@ -16,6 +16,7 @@ create table if not exists public.fichas_rpg (
 
 create index if not exists fichas_rpg_user_id_idx on public.fichas_rpg(user_id);
 create index if not exists fichas_rpg_updated_at_idx on public.fichas_rpg(updated_at desc);
+create index if not exists fichas_rpg_local_id_idx on public.fichas_rpg((personagem->>'localId'));
 
 create or replace function public.set_updated_at()
 returns trigger

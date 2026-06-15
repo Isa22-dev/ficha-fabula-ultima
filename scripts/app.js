@@ -18,6 +18,7 @@ const bondTypes = {
 };
 const defaultSheet = () => ({
   id: null,
+  localId: createLocalId(),
   nome: "",
   classe: "",
   nivel: 1,
@@ -412,6 +413,7 @@ async function salvarFicha(options = {}) {
 
   try {
     const payload = toPayload();
+    if (!state.id) state.id = await encontrarFichaExistente();
     const request = state.id
       ? db.from("fichas_rpg").update(payload).eq("id", state.id).select("id").single()
       : db.from("fichas_rpg").insert(payload).select("id").single();
@@ -440,6 +442,17 @@ async function salvarFicha(options = {}) {
 
 async function salvarFichaSupabase() {
   return salvarFicha();
+}
+
+async function encontrarFichaExistente() {
+  if (!state.localId) state.localId = createLocalId();
+  const { data, error } = await db
+    .from("fichas_rpg")
+    .select("id")
+    .eq("personagem->>localId", state.localId)
+    .maybeSingle();
+  if (error) return null;
+  return data?.id || null;
 }
 
 async function carregarFicha(id) {
@@ -510,8 +523,10 @@ function novaFicha() {
 function resetarFicha() {
   if (!confirm("Resetar os campos da ficha atual?")) return;
   const id = state.id;
+  const localId = state.localId;
   state = defaultSheet();
   state.id = id;
+  state.localId = localId;
   hydrateForm();
   renderAll();
   markDirty();
@@ -526,6 +541,7 @@ function toPayload() {
     origem: state.origem,
     retrato: state.retrato,
     personagem: {
+      localId: state.localId,
       identidade: {
         nome: state.nome,
         classe: state.classe,
@@ -571,6 +587,7 @@ function fromRow(row) {
     ...sheet,
     ...personagem,
     id: row.id,
+    localId: personagem.localId || sheet.localId,
     nome: row.nome || "",
     classe: row.classe || "",
     nivel: row.nivel || 1,
@@ -692,6 +709,7 @@ function importarJSON(event) {
   const reader = new FileReader();
   reader.onload = () => {
     state = { ...defaultSheet(), ...JSON.parse(reader.result) };
+    if (!state.localId) state.localId = createLocalId();
     hydrateForm();
     renderAll();
     markDirty();
@@ -776,9 +794,15 @@ function restoreLocalBackup() {
   if (!backup || user) return;
   try {
     state = { ...defaultSheet(), ...JSON.parse(backup) };
+    if (!state.localId) state.localId = createLocalId();
   } catch {
     localStorage.removeItem(backupKey);
   }
+}
+
+function createLocalId() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function setLoading(active) {
