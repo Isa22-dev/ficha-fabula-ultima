@@ -320,10 +320,12 @@ function removeItem(list, index) {
 }
 
 async function login() {
+  const username = getAuthUsername();
+  if (!username) return;
   try {
     setLoading(true);
     const { error, data } = await db.auth.signInWithPassword({
-      email: $("#authEmail").value.trim(),
+      email: usernameToAuthEmail(username),
       password: $("#authPassword").value
     });
     if (error) return toast(authErrorMessage(error), "danger");
@@ -338,7 +340,8 @@ async function login() {
 }
 
 async function signup() {
-  const email = $("#authEmail").value.trim();
+  const username = getAuthUsername();
+  if (!username) return;
   const password = $("#authPassword").value;
   if (password.length < 6) {
     toast("A senha precisa ter pelo menos 6 caracteres.", "danger");
@@ -348,9 +351,10 @@ async function signup() {
   try {
     setLoading(true);
     const { error, data } = await db.auth.signUp({
-      email,
+      email: usernameToAuthEmail(username),
       password,
       options: {
+        data: { username },
         emailRedirectTo: window.location.origin
       }
     });
@@ -361,7 +365,7 @@ async function signup() {
       toast("Cadastro criado e login realizado.");
       return;
     }
-    toast("Cadastro criado. Confirme seu email antes de entrar.");
+    toast("Cadastro criado. Desative confirmacao de email no Supabase para entrar sem email.", "danger");
   } catch (error) {
     toast(authErrorMessage(error), "danger");
   } finally {
@@ -873,6 +877,19 @@ function toast(message, type = "success") {
   setTimeout(() => item.remove(), 3600);
 }
 
+function getAuthUsername() {
+  const username = $("#authUsername").value.trim().toLowerCase();
+  if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
+    toast("Use um username com 3 a 32 caracteres: letras, numeros, ponto, traco ou underline.", "danger");
+    return "";
+  }
+  return username;
+}
+
+function usernameToAuthEmail(username) {
+  return `${username}@ficha-fabula.local`;
+}
+
 function handleSupabaseError(error, showToast = true) {
   setLoading(false);
   const message = supabaseErrorMessage(error);
@@ -904,10 +921,10 @@ function supabaseErrorMessage(error) {
 function authErrorMessage(error) {
   const message = error?.message || String(error || "Erro desconhecido.");
   const normalized = message.toLowerCase();
-  if (normalized.includes("email not confirmed")) return "Confirme seu email antes de entrar.";
-  if (normalized.includes("invalid login credentials")) return "Email ou senha incorretos.";
+  if (normalized.includes("email not confirmed")) return "Desative a confirmacao de email no Supabase para usar username sem email.";
+  if (normalized.includes("invalid login credentials")) return "Username ou senha incorretos.";
   if (normalized.includes("password")) return "A senha precisa ter pelo menos 6 caracteres.";
-  if (normalized.includes("already registered") || normalized.includes("already exists")) return "Este email ja esta cadastrado. Use Entrar.";
+  if (normalized.includes("already registered") || normalized.includes("already exists")) return "Este username ja esta cadastrado. Use Entrar.";
   if (normalized.includes("failed to fetch") || normalized.includes("network")) return "Nao foi possivel conectar ao Supabase agora.";
   return message;
 }

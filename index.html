@@ -68,10 +68,10 @@
           <div class="auth-copy">
             <p class="eyebrow">Supabase Auth</p>
             <h2>Acesse suas fichas online</h2>
-            <p>Cadastre ou entre com email e senha para sincronizar personagens com Row Level Security.</p>
+            <p>Cadastre ou entre com username e senha para sincronizar personagens com Row Level Security.</p>
           </div>
           <form class="auth-form" id="authForm">
-            <label>Email<input type="email" id="authEmail" autocomplete="email" required /></label>
+            <label>Username<input type="text" id="authUsername" autocomplete="username" minlength="3" maxlength="32" required /></label>
             <label>Senha<input type="password" id="authPassword" autocomplete="current-password" required /></label>
             <div class="button-row">
               <button class="primary-button" type="submit" data-auth="login"><i class="ti ti-login"></i>Entrar</button>
