@@ -143,15 +143,15 @@ function bindEvents() {
   });
   $("#signupBtn").addEventListener("click", signup);
   $("#logoutBtn").addEventListener("click", logout);
-  $("#saveBtn").addEventListener("click", salvarFicha);
+  $("#saveBtn")?.addEventListener("click", salvarFicha);
   $("#saveBtnTop").addEventListener("click", salvarFicha);
   $("#newSheetBtn").addEventListener("click", novaFicha);
   $("#newSheetBtnSettings").addEventListener("click", novaFicha);
   $("#loadSelectedBtn").addEventListener("click", () => carregarFichaSupabase($("#sheetSelect").value));
   $("#deleteBtn").addEventListener("click", excluirFicha);
   $("#resetBtn").addEventListener("click", resetarFicha);
-  $("#exportBtn").addEventListener("click", exportarJSON);
-  $("#importInput").addEventListener("change", importarJSON);
+  $("#exportBtn")?.addEventListener("click", exportarJSON);
+  $("#importInput")?.addEventListener("change", importarJSON);
   $("#profilePhotoInput").addEventListener("change", importarFotoPerfil);
   $("#removePhotoBtn").addEventListener("click", removerFotoPerfil);
   $("#themeToggle").addEventListener("click", toggleTheme);
