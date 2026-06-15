@@ -72,6 +72,10 @@ async function init() {
   setLoading(true);
   const { data } = await db.auth.getSession();
   user = data.session?.user || null;
+  db.auth.onAuthStateChange((_event, session) => {
+    user = session?.user || null;
+    refreshAuthState();
+  });
   restoreLocalBackup();
   await refreshAuthState();
   hydrateForm();
@@ -295,27 +299,53 @@ function removeItem(list, index) {
 }
 
 async function login() {
-  setLoading(true);
-  const { error, data } = await db.auth.signInWithPassword({
-    email: $("#authEmail").value,
-    password: $("#authPassword").value
-  });
-  setLoading(false);
-  if (error) return toast(error.message, "danger");
-  user = data.user;
-  await refreshAuthState();
-  toast("Login realizado.");
+  try {
+    setLoading(true);
+    const { error, data } = await db.auth.signInWithPassword({
+      email: $("#authEmail").value.trim(),
+      password: $("#authPassword").value
+    });
+    if (error) return toast(authErrorMessage(error), "danger");
+    user = data.user;
+    await refreshAuthState();
+    toast("Login realizado.");
+  } catch (error) {
+    toast(authErrorMessage(error), "danger");
+  } finally {
+    setLoading(false);
+  }
 }
 
 async function signup() {
-  setLoading(true);
-  const { error } = await db.auth.signUp({
-    email: $("#authEmail").value,
-    password: $("#authPassword").value
-  });
-  setLoading(false);
-  if (error) return toast(error.message, "danger");
-  toast("Cadastro criado. Verifique seu email se a confirmacao estiver ativa.");
+  const email = $("#authEmail").value.trim();
+  const password = $("#authPassword").value;
+  if (password.length < 6) {
+    toast("A senha precisa ter pelo menos 6 caracteres.", "danger");
+    return;
+  }
+
+  try {
+    setLoading(true);
+    const { error, data } = await db.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: window.location.origin
+      }
+    });
+    if (error) return toast(authErrorMessage(error), "danger");
+    if (data.session) {
+      user = data.user;
+      await refreshAuthState();
+      toast("Cadastro criado e login realizado.");
+      return;
+    }
+    toast("Cadastro criado. Confirme seu email antes de entrar.");
+  } catch (error) {
+    toast(authErrorMessage(error), "danger");
+  } finally {
+    setLoading(false);
+  }
 }
 
 async function cadastrarUsuario() {
@@ -667,6 +697,17 @@ function toast(message, type = "success") {
   item.textContent = message;
   $("#toastStack").appendChild(item);
   setTimeout(() => item.remove(), 3600);
+}
+
+function authErrorMessage(error) {
+  const message = error?.message || String(error || "Erro desconhecido.");
+  const normalized = message.toLowerCase();
+  if (normalized.includes("email not confirmed")) return "Confirme seu email antes de entrar.";
+  if (normalized.includes("invalid login credentials")) return "Email ou senha incorretos.";
+  if (normalized.includes("password")) return "A senha precisa ter pelo menos 6 caracteres.";
+  if (normalized.includes("already registered") || normalized.includes("already exists")) return "Este email ja esta cadastrado. Use Entrar.";
+  if (normalized.includes("failed to fetch") || normalized.includes("network")) return "Nao foi possivel conectar ao Supabase agora.";
+  return message;
 }
 
 function applySavedTheme() {
