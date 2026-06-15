@@ -16,6 +16,14 @@ const bondTypes = {
   Aliado: "#9b5de5",
   Neutro: "#8d95b7"
 };
+const themeNames = {
+  purple: "Roxo",
+  red: "Vermelho",
+  orange: "Laranja",
+  green: "Verde",
+  blue: "Azul",
+  light: "Claro"
+};
 
 const defaultSheet = () => ({
   id: null,
@@ -156,7 +164,7 @@ function bindEvents() {
   $("#importInput")?.addEventListener("change", importarJSON);
   $("#profilePhotoInput").addEventListener("change", importarFotoPerfil);
   $("#removePhotoBtn").addEventListener("click", removerFotoPerfil);
-  $("#themeSelect").addEventListener("change", (event) => setTheme(event.target.value));
+  $("#themeButton").addEventListener("click", toggleThemeMenu);
   $("#sheetSelect").addEventListener("change", () => carregarFicha($("#sheetSelect").value));
   $("#addMemory").addEventListener("click", addMemory);
   $("#addEquipment").addEventListener("click", addEquipment);
@@ -166,9 +174,16 @@ function bindEvents() {
     const remove = event.target.closest("[data-remove]");
     const roll = event.target.closest("[data-die]");
     const attrRoll = event.target.closest("[data-roll-attribute]");
+    const themeOption = event.target.closest("[data-theme-option]");
     if (remove) removeItem(remove.dataset.remove, Number(remove.dataset.index));
     if (roll) rollDie(Number(roll.dataset.die));
     if (attrRoll) rollDie(Number(state.atributos[attrRoll.dataset.rollAttribute].replace("d", "")), attrRoll.dataset.rollAttribute);
+    if (themeOption) {
+      setTheme(themeOption.dataset.themeOption);
+      closeThemeMenu();
+    } else if (!event.target.closest("#themeMenu")) {
+      closeThemeMenu();
+    }
   });
 
   document.addEventListener("keydown", (event) => {
@@ -669,9 +684,22 @@ function applySavedTheme() {
 
 function setTheme(theme, persist = true) {
   document.body.dataset.theme = theme;
-  const select = $("#themeSelect");
-  if (select) select.value = theme;
+  $("#themeLabel").textContent = themeNames[theme] || "Temas";
+  $$("[data-theme-option]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.themeOption === theme);
+  });
   if (persist) localStorage.setItem(themeKey, theme);
+}
+
+function toggleThemeMenu() {
+  const menu = $("#themeMenu");
+  const isOpen = menu.classList.toggle("open");
+  $("#themeButton").setAttribute("aria-expanded", String(isOpen));
+}
+
+function closeThemeMenu() {
+  $("#themeMenu").classList.remove("open");
+  $("#themeButton").setAttribute("aria-expanded", "false");
 }
 
 function skeleton(text) {
