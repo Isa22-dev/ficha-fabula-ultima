@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0d0d18" />
+    <title>Ficha Fabula Ultima</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+    <link rel="stylesheet" href="./styles/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">FU</span>
+          <div>
+            <strong>Ficha Fabula Ultima</strong>
+            <small>Terminal de memorias</small>
+          </div>
+        </div>
+        <nav class="nav-tabs" aria-label="Secoes da ficha">
+          <button class="nav-tab active" data-tab="identidade"><i class="ti ti-id"></i><span>Identidade</span></button>
+          <button class="nav-tab" data-tab="recursos"><i class="ti ti-heart-bolt"></i><span>Recursos</span></button>
+          <button class="nav-tab" data-tab="atributos"><i class="ti ti-dice-5"></i><span>Atributos</span></button>
+          <button class="nav-tab" data-tab="memorias"><i class="ti ti-brain"></i><span>Memorias</span></button>
+          <button class="nav-tab" data-tab="equipamentos"><i class="ti ti-sword"></i><span>Equipamentos</span></button>
+          <button class="nav-tab" data-tab="lacos"><i class="ti ti-link"></i><span>Lacos</span></button>
+          <button class="nav-tab" data-tab="dados"><i class="ti ti-cube"></i><span>Dados</span></button>
+          <button class="nav-tab" data-tab="visualizacao"><i class="ti ti-file-description"></i><span>Visualizacao</span></button>
+          <button class="nav-tab" data-tab="configuracoes"><i class="ti ti-settings"></i><span>Configuracoes</span></button>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <button class="icon-button mobile-menu" id="mobileMenu" title="Abrir menu"><i class="ti ti-menu-2"></i></button>
+          <div>
+            <p class="eyebrow">Cyberpunk RPG Cloud Sheet</p>
+            <h1>Ficha Fabula Ultima</h1>
+          </div>
+          <div class="top-actions">
+            <select id="sheetSelect" class="compact-select" title="Fichas salvas"></select>
+            <button class="icon-button" id="newSheetBtn" title="Nova ficha"><i class="ti ti-file-plus"></i></button>
+            <button class="icon-button" id="saveBtnTop" title="Salvar"><i class="ti ti-device-floppy"></i></button>
+            <button class="icon-button" id="themeToggle" title="Alternar tema"><i class="ti ti-moon-stars"></i></button>
+          </div>
+        </header>
+
+        <section class="auth-panel" id="authPanel">
+          <div class="auth-copy">
+            <p class="eyebrow">Supabase Auth</p>
+            <h2>Acesse suas fichas online</h2>
+            <p>Cadastre ou entre com email e senha para sincronizar personagens com Row Level Security.</p>
+          </div>
+          <form class="auth-form" id="authForm">
+            <label>Email<input type="email" id="authEmail" autocomplete="email" required /></label>
+            <label>Senha<input type="password" id="authPassword" autocomplete="current-password" required /></label>
+            <div class="button-row">
+              <button class="primary-button" type="submit" data-auth="login"><i class="ti ti-login"></i>Entrar</button>
+              <button class="ghost-button" type="button" id="signupBtn"><i class="ti ti-user-plus"></i>Cadastrar</button>
+            </div>
+          </form>
+        </section>
+
+        <div class="loading-screen hidden" id="loadingScreen">
+          <div class="loader"></div>
+          <span>Sincronizando dados...</span>
+        </div>
+
+        <form class="sheet-form" id="sheetForm">
+          <section class="tab-panel active" id="identidade">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Identidade</p>
+                <h2>Protocolo do personagem</h2>
+              </div>
+            </div>
+            <div class="identity-grid">
+              <label>Nome<input data-field="nome" placeholder="Nome do heroi" /></label>
+              <label>Nivel<input type="number" min="1" data-field="nivel" /></label>
+              <label>Classe<input data-field="classe" /></label>
+              <label>Tema<input data-field="tema" /></label>
+              <label>Origem<input data-field="origem" /></label>
+              <label>Idade<input data-field="idade" /></label>
+              <label>Altura<input data-field="altura" /></label>
+              <label>Peso<input data-field="peso" /></label>
+              <label>Retrato URL<input data-field="retrato" placeholder="https://..." /></label>
+              <label>Pecado<input data-field="pecado" /></label>
+              <label class="span-2">Aparencia<textarea data-field="aparencia"></textarea></label>
+              <label class="span-2">Historico<textarea data-field="historico"></textarea></label>
+              <label class="span-2">Alerta<textarea data-field="alerta"></textarea></label>
+            </div>
+          </section>
+
+          <section class="tab-panel" id="recursos">
+            <div class="section-head"><div><p class="eyebrow">Recursos</p><h2>Nucleos vitais</h2></div></div>
+            <div class="resource-grid" id="resourceGrid"></div>
+            <div class="combat-grid">
+              <label>Defesa<input type="number" data-field="defesa" /></label>
+              <label>Defesa Magica<input type="number" data-field="defesaMagica" /></label>
+              <label>Iniciativa<input type="number" data-field="iniciativa" /></label>
+              <label class="span-2">Condicoes<textarea data-field="condicoes"></textarea></label>
+            </div>
+          </section>
+
+          <section class="tab-panel" id="atributos">
+            <div class="section-head"><div><p class="eyebrow">Atributos</p><h2>Matriz de dados</h2></div></div>
+            <div class="attribute-grid" id="attributeGrid"></div>
+          </section>
+
+          <section class="tab-panel" id="memorias">
+            <div class="section-head">
+              <div><p class="eyebrow">Memorias</p><h2>Habilidades registradas</h2></div>
+              <button class="primary-button" type="button" id="addMemory"><i class="ti ti-plus"></i>Adicionar</button>
+            </div>
+            <div class="card-grid" id="memoryList"></div>
+          </section>
+
+          <section class="tab-panel" id="equipamentos">
+            <div class="section-head">
+              <div><p class="eyebrow">Equipamentos</p><h2>Inventario tatico</h2></div>
+              <button class="primary-button" type="button" id="addEquipment"><i class="ti ti-plus"></i>Adicionar</button>
+            </div>
+            <div class="card-grid" id="equipmentList"></div>
+          </section>
+
+          <section class="tab-panel" id="lacos">
+            <div class="section-head">
+              <div><p class="eyebrow">Lacos</p><h2>Rede emocional</h2></div>
+              <button class="primary-button" type="button" id="addBond"><i class="ti ti-plus"></i>Adicionar</button>
+            </div>
+            <div class="card-grid" id="bondList"></div>
+          </section>
+
+          <section class="tab-panel dice-panel" id="dados">
+            <div class="section-head"><div><p class="eyebrow">Dados</p><h2>Simulador RPG 3D</h2></div></div>
+            <div class="dice-layout">
+              <div class="dice-stage">
+                <div class="die d20" id="dieVisual"><span id="dieNumber">20</span></div>
+                <strong id="diceResult">Escolha um dado</strong>
+                <small id="diceDetail">A rolagem aparece aqui com criticos e falhas.</small>
+              </div>
+              <div class="dice-controls" id="diceControls"></div>
+              <div class="roll-history">
+                <h3>Historico</h3>
+                <div id="rollHistory"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="tab-panel" id="visualizacao">
+            <div class="section-head"><div><p class="eyebrow">Visualizacao</p><h2>Ficha premium</h2></div></div>
+            <article class="preview-sheet" id="previewSheet"></article>
+          </section>
+
+          <section class="tab-panel" id="configuracoes">
+            <div class="section-head"><div><p class="eyebrow">Configuracoes</p><h2>Operacoes da ficha</h2></div></div>
+            <p class="settings-note">Os dados sao salvos no Supabase e podem ser acessados online apos login.</p>
+            <div class="settings-grid">
+              <button class="primary-button" type="button" id="saveBtn"><i class="ti ti-device-floppy"></i>Salvar no Supabase</button>
+              <button class="ghost-button" type="button" id="loadSelectedBtn"><i class="ti ti-database-import"></i>Carregar ficha</button>
+              <button class="ghost-button" type="button" id="newSheetBtnSettings"><i class="ti ti-file-plus"></i>Nova ficha</button>
+              <button class="ghost-button" type="button" id="exportBtn"><i class="ti ti-download"></i>Exportar JSON</button>
+              <label class="file-button"><i class="ti ti-upload"></i>Importar JSON<input type="file" id="importInput" accept="application/json" /></label>
+              <button class="danger-button" type="button" id="deleteBtn"><i class="ti ti-trash"></i>Excluir Ficha</button>
+              <button class="ghost-button" type="button" id="resetBtn"><i class="ti ti-refresh"></i>Resetar Ficha</button>
+              <button class="ghost-button" type="button" id="logoutBtn"><i class="ti ti-logout"></i>Logout</button>
+            </div>
+          </section>
+        </form>
+      </main>
+    </div>
+
+    <div class="toast-stack" id="toastStack"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./scripts/supabase.js"></script>
+    <script src="./scripts/app.js"></script>
+  </body>
+</html>
