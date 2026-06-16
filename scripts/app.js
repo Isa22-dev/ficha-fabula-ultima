@@ -320,12 +320,12 @@ function removeItem(list, index) {
 }
 
 async function login() {
-  const username = getAuthUsername();
-  if (!username) return;
+  const loginId = getAuthLoginId();
+  if (!loginId) return;
   try {
     setLoading(true);
     const { error, data } = await db.auth.signInWithPassword({
-      email: usernameToAuthEmail(username),
+      email: loginId.email,
       password: $("#authPassword").value
     });
     if (error) return toast(authErrorMessage(error), "danger");
@@ -340,8 +340,8 @@ async function login() {
 }
 
 async function signup() {
-  const username = getAuthUsername();
-  if (!username) return;
+  const loginId = getAuthLoginId();
+  if (!loginId) return;
   const password = $("#authPassword").value;
   if (password.length < 6) {
     toast("A senha precisa ter pelo menos 6 caracteres.", "danger");
@@ -351,10 +351,10 @@ async function signup() {
   try {
     setLoading(true);
     const { error, data } = await db.auth.signUp({
-      email: usernameToAuthEmail(username),
+      email: loginId.email,
       password,
       options: {
-        data: { username },
+        data: { username: loginId.username, loginType: loginId.type },
         emailRedirectTo: window.location.origin
       }
     });
@@ -877,13 +877,28 @@ function toast(message, type = "success") {
   setTimeout(() => item.remove(), 3600);
 }
 
-function getAuthUsername() {
-  const username = $("#authUsername").value.trim().toLowerCase();
-  if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
-    toast("Use um username com 3 a 32 caracteres: letras, numeros, ponto, traco ou underline.", "danger");
-    return "";
+function getAuthLoginId() {
+  const value = $("#authLogin").value.trim().toLowerCase();
+  if (isEmail(value)) {
+    return {
+      email: value,
+      type: "email",
+      username: value.split("@")[0].replace(/[^a-z0-9._-]/g, "").slice(0, 32) || "usuario"
+    };
   }
-  return username;
+  if (!/^[a-z0-9._-]{3,32}$/.test(value)) {
+    toast("Use um username com 3 a 32 caracteres ou um email valido.", "danger");
+    return null;
+  }
+  return {
+    email: usernameToAuthEmail(value),
+    type: "username",
+    username: value
+  };
+}
+
+function isEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 function usernameToAuthEmail(username) {
@@ -922,10 +937,10 @@ function authErrorMessage(error) {
   const message = error?.message || String(error || "Erro desconhecido.");
   const normalized = message.toLowerCase();
   if (normalized.includes("email logins are disabled")) return "Ative o provedor Email no Supabase e desative apenas a confirmacao de email.";
-  if (normalized.includes("email not confirmed")) return "Desative a confirmacao de email no Supabase para usar username sem email.";
-  if (normalized.includes("invalid login credentials")) return "Username ou senha incorretos.";
+  if (normalized.includes("email not confirmed")) return "Confirme o email ou desative a confirmacao no Supabase.";
+  if (normalized.includes("invalid login credentials")) return "Username/email ou senha incorretos.";
   if (normalized.includes("password")) return "A senha precisa ter pelo menos 6 caracteres.";
-  if (normalized.includes("already registered") || normalized.includes("already exists")) return "Este username ja esta cadastrado. Use Entrar.";
+  if (normalized.includes("already registered") || normalized.includes("already exists")) return "Este acesso ja esta cadastrado. Use Entrar.";
   if (normalized.includes("failed to fetch") || normalized.includes("network")) return "Nao foi possivel conectar ao Supabase agora.";
   return message;
 }

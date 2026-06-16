@@ -39,7 +39,7 @@ vercel.json
 ## Funcionalidades
 
 - Tela de autenticação no estilo cyberpunk
-- Cadastro com username e senha
+- Cadastro com username ou email e senha
 - Login e logout com Supabase Auth
 - Cada usuario acessa apenas suas proprias fichas
 - Identidade, recursos, atributos, habilidades, equipamentos, lacos, dados, visualizacao e configuracoes
@@ -56,7 +56,7 @@ vercel.json
 1. Crie um projeto em `https://supabase.com`.
 2. Abra `SQL Editor`.
 3. Execute o arquivo [`sql/supabase.sql`](sql/supabase.sql).
-4. Em `Authentication > Providers`, mantenha `Email` ativado e desative a confirmacao de email para usar username sem validacao por email.
+4. Em `Authentication > Providers`, mantenha `Email` ativado. Para username sem confirmacao, desative a confirmacao de email; para email real, voce pode manter a confirmacao se preferir.
 5. Copie a `Project URL` e a `anon public key` em `Project Settings > API`.
 6. Abra [`scripts/supabase.js`](scripts/supabase.js) e configure:
 
