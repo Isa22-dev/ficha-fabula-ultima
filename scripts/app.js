@@ -921,6 +921,7 @@ function supabaseErrorMessage(error) {
 function authErrorMessage(error) {
   const message = error?.message || String(error || "Erro desconhecido.");
   const normalized = message.toLowerCase();
+  if (normalized.includes("email logins are disabled")) return "Ative o provedor Email no Supabase e desative apenas a confirmacao de email.";
   if (normalized.includes("email not confirmed")) return "Desative a confirmacao de email no Supabase para usar username sem email.";
   if (normalized.includes("invalid login credentials")) return "Username ou senha incorretos.";
   if (normalized.includes("password")) return "A senha precisa ter pelo menos 6 caracteres.";
