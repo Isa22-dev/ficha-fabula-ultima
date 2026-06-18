@@ -68,6 +68,7 @@ let deleteModalOpen = false;
 let pendingDeleteId = null;
 let selectedLibraryId = null;
 let unsavedModalOpen = false;
+let drawerOpen = false;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -95,11 +96,47 @@ function bindNavigation() {
     button.addEventListener("click", () => {
       const tab = button.dataset.tab;
       ativarAba(tab);
-      $(".sidebar").classList.remove("open");
+      closeDrawer();
       if (tab === "visualizacao") renderPreview();
     });
   });
-  $("#mobileMenu").addEventListener("click", () => $(".sidebar").classList.toggle("open"));
+  $("#mobileMenu").addEventListener("click", toggleDrawer);
+}
+
+function setDrawerState(isOpen) {
+  const drawer = document.getElementById("drawerMenu");
+  const icon = document.getElementById("drawerIcon");
+
+  if (!drawer) {
+    console.error("drawerMenu não encontrado");
+    return;
+  }
+
+  drawerOpen = isOpen;
+
+  if (drawerOpen) {
+    drawer.classList.add("open");
+    drawer.classList.remove("closed");
+    if (icon) {
+      icon.classList.remove("ti-menu-2");
+      icon.classList.add("ti-x");
+    }
+  } else {
+    drawer.classList.remove("open");
+    drawer.classList.add("closed");
+    if (icon) {
+      icon.classList.remove("ti-x");
+      icon.classList.add("ti-menu-2");
+    }
+  }
+}
+
+function toggleDrawer() {
+  setDrawerState(!drawerOpen);
+}
+
+function closeDrawer() {
+  setDrawerState(false);
 }
 
 function abrirConfiguracoes() {
