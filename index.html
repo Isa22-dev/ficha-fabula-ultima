@@ -292,8 +292,107 @@
         </div>
       </div>
     </div>
+    <!-- Botão Flutuante de Sessão -->
+    <button class="session-float-button" id="sessionFloatBtn" title="Abrir painel de sessão">
+      <i class="ti ti-notes"></i>
+      <span class="session-float-label">Sessão</span>
+    </button>
+
+    <!-- Painel Flutuante -->
+    <aside class="session-panel" id="sessionPanel" role="dialog" aria-label="Painel de Sessão">
+      <div class="session-panel-header">
+        <h2>Sessão</h2>
+        <button class="session-close-btn" id="sessionCloseBtn" title="Fechar painel">
+          <i class="ti ti-x"></i>
+        </button>
+      </div>
+
+      <div class="session-tabs">
+        <button class="session-tab active" data-tab="notes" title="Anotações">
+          <i class="ti ti-notes"></i>
+          <span>Anotações</span>
+        </button>
+        <button class="session-tab" data-tab="dice" title="Dados">
+          <i class="ti ti-dice-5"></i>
+          <span>Dados</span>
+        </button>
+      </div>
+
+      <div class="session-content">
+        <!-- Aba Anotações -->
+        <div class="session-tab-content active" data-tab="notes">
+          <div class="notes-container">
+            <textarea class="notes-input" id="sessionNotes" placeholder="Escreva suas anotações..."></textarea>
+            <div class="notes-actions">
+              <button class="ghost-button" id="clearNotesBtn" title="Limpar anotações">
+                <i class="ti ti-trash"></i>
+                Limpar
+              </button>
+              <button class="ghost-button" id="exportNotesBtn" title="Exportar anotações">
+                <i class="ti ti-download"></i>
+                Exportar TXT
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aba Dados -->
+        <div class="session-tab-content" data-tab="dice">
+          <div class="dice-container">
+            <!-- Área de Rolagem 3D -->
+            <div class="dice-viewport" id="diceViewport"></div>
+
+            <!-- Controles de Dados -->
+            <div class="dice-controls-panel">
+              <div class="dice-buttons">
+                <button class="dice-btn" data-dice="d4">d4</button>
+                <button class="dice-btn" data-dice="d6">d6</button>
+                <button class="dice-btn" data-dice="d8">d8</button>
+                <button class="dice-btn" data-dice="d10">d10</button>
+                <button class="dice-btn" data-dice="d12">d12</button>
+                <button class="dice-btn" data-dice="d20">d20</button>
+              </div>
+
+              <!-- Seleção de Quantidade -->
+              <div class="dice-quantity-panel">
+                <label for="diceQuantity">Quantidade:</label>
+                <select id="diceQuantity">
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="10">10</option>
+                </select>
+              </div>
+
+              <!-- Resultado -->
+              <div class="dice-result" id="diceResult">
+                <div class="result-display">Resultado: -</div>
+              </div>
+            </div>
+
+            <!-- Histórico -->
+            <div class="dice-history">
+              <div class="history-header">
+                <h3>Histórico</h3>
+                <button class="ghost-button mini" id="clearHistoryBtn" title="Limpar histórico">
+                  <i class="ti ti-trash"></i>
+                </button>
+              </div>
+              <div class="history-list" id="historyList">
+                <p class="empty-state">Nenhuma rolagem realizada</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./scripts/supabase.js"></script>
+    <script src="./scripts/session-panel.js"></script>
+    <script src="./scripts/dice3d.js"></script>
     <script src="./scripts/app.js"></script>
   </body>
 </html>
