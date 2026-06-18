@@ -76,6 +76,7 @@
             <h1>Ficha Fabula Ultima</h1>
           </div>
           <div class="top-actions">
+            <button class="ghost-button hidden" type="button" id="backToLibraryBtn"><i class="ti ti-books"></i>Biblioteca</button>
             <select id="sheetSelect" class="compact-select" title="Fichas salvas"></select>
             <button class="icon-button" id="newSheetBtn" title="Nova ficha"><i class="ti ti-file-plus"></i></button>
             <button class="icon-button" id="saveBtnTop" title="Salvar"><i class="ti ti-device-floppy"></i></button>
@@ -121,6 +122,57 @@
           <div class="loader"></div>
           <span>Sincronizando dados...</span>
         </div>
+
+        <section class="arcane-library hidden" id="arcaneLibrary">
+          <header class="library-header">
+            <div>
+              <p class="eyebrow">Acervo de grimorios</p>
+              <h2>Biblioteca Arcana</h2>
+              <p>Escolha um livro para acessar a ficha salva</p>
+            </div>
+            <button class="primary-button" type="button" id="newBookBtn"><i class="ti ti-book-2"></i>Novo Livro</button>
+          </header>
+
+          <div class="library-layout">
+            <section class="book-grid" id="bookGrid" aria-label="Fichas salvas"></section>
+
+            <aside class="reading-panel hidden" id="readingPanel">
+              <p class="eyebrow">Painel de leitura</p>
+              <h3 id="readingName">Selecione um livro</h3>
+              <div class="reading-tags">
+                <span id="readingClass">Classe</span>
+                <span id="readingLevel">Nv. -</span>
+                <span id="readingTheme">Tema</span>
+              </div>
+              <dl class="reading-stats">
+                <div><dt>Origem</dt><dd id="readingOrigin">-</dd></div>
+                <div><dt>Defesa</dt><dd id="readingDefense">-</dd></div>
+              </dl>
+              <div class="reading-resource">
+                <span>PV</span><strong id="readingPvText">0/0</strong>
+                <div class="reading-track"><div class="reading-fill pv" id="readingPvFill"></div></div>
+              </div>
+              <div class="reading-resource">
+                <span>PM</span><strong id="readingPmText">0/0</strong>
+                <div class="reading-track"><div class="reading-fill pm" id="readingPmFill"></div></div>
+              </div>
+              <div class="reading-resource">
+                <span>PF</span><strong id="readingPfText">0/0</strong>
+                <div class="reading-track"><div class="reading-fill pf" id="readingPfFill"></div></div>
+              </div>
+              <div class="reading-memories">
+                <h4>Memorias principais</h4>
+                <div id="readingMemories"></div>
+              </div>
+              <div class="reading-actions">
+                <button class="primary-button" type="button" id="openFullSheetBtn"><i class="ti ti-door-enter"></i>Abrir Ficha Completa</button>
+                <button class="ghost-button" type="button" id="editBookBtn"><i class="ti ti-edit"></i>Editar</button>
+                <button class="ghost-button" type="button" id="saveBookBtn"><i class="ti ti-device-floppy"></i>Salvar</button>
+                <button class="danger-button" type="button" id="deleteBookBtn"><i class="ti ti-trash"></i>Excluir</button>
+              </div>
+            </aside>
+          </div>
+        </section>
 
         <section class="empty-state hidden" id="emptyState">
           <p class="eyebrow">Gerenciamento de fichas</p>

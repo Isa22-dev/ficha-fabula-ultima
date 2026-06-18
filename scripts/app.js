@@ -67,6 +67,7 @@ let pendingSave = false;
 let sheetList = [];
 let deleteModalOpen = false;
 let pendingDeleteId = null;
+let selectedLibraryId = null;
 let hudLastValues = {};
 let hudTypingTimer = null;
 let hudLastName = "";
@@ -170,6 +171,7 @@ function bindEvents() {
   $("#saveBtnTop").addEventListener("click", () => salvarFicha());
   $("#newSheetBtn").addEventListener("click", novaFicha);
   $("#emptyNewSheetBtn").addEventListener("click", novaFicha);
+  $("#newBookBtn").addEventListener("click", criarNovoLivro);
   $("#newSheetBtnSettings").addEventListener("click", novaFicha);
   $("#loadSelectedBtn").addEventListener("click", () => carregarFichaSupabase($("#sheetSelect").value));
   $("#deleteBtn").addEventListener("click", abrirModalExclusao);
@@ -185,6 +187,11 @@ function bindEvents() {
   $("#removePhotoBtn").addEventListener("click", removerFotoPerfil);
   $("#themeButton").addEventListener("click", toggleThemeMenu);
   $("#hudToggle").addEventListener("click", toggleFloatingHud);
+  $("#backToLibraryBtn").addEventListener("click", voltarParaBiblioteca);
+  $("#openFullSheetBtn").addEventListener("click", abrirFichaSelecionadaCompleta);
+  $("#editBookBtn").addEventListener("click", abrirFichaSelecionadaCompleta);
+  $("#saveBookBtn").addEventListener("click", () => salvarFicha());
+  $("#deleteBookBtn").addEventListener("click", () => excluirFichaComConfirmacao(selectedLibraryId));
   $("#sheetSelect").addEventListener("change", () => carregarFicha($("#sheetSelect").value));
   $("#addMemory").addEventListener("click", addMemory);
   $("#addEquipment").addEventListener("click", addEquipment);
@@ -196,9 +203,11 @@ function bindEvents() {
     const roll = event.target.closest("[data-die]");
     const attrRoll = event.target.closest("[data-roll-attribute]");
     const themeOption = event.target.closest("[data-theme-option]");
+    const book = event.target.closest("[data-book-id]");
     if (remove && state) removeItem(remove.dataset.remove, Number(remove.dataset.index));
     if (roll && state) rollDie(Number(roll.dataset.die));
     if (attrRoll && state) rolarAtributo(attrRoll.dataset.rollAttribute);
+    if (book) abrirLivroFicha(book.dataset.bookId);
     if (themeOption) {
       setTheme(themeOption.dataset.themeOption);
       closeThemeMenu();
@@ -231,11 +240,11 @@ function setField(field, value) {
 function updateWorkspaceState() {
   const hasUser = Boolean(user);
   const hasSheet = Boolean(state);
-  const hasSavedSheets = sheetList.length > 0;
+  const libraryVisible = hasUser && !hasSheet;
+  $("#arcaneLibrary").classList.toggle("hidden", !libraryVisible);
   $("#sheetForm").classList.toggle("hidden", !hasUser || !hasSheet);
-  $("#emptyState").classList.toggle("hidden", !hasUser || hasSheet);
-  $("#emptyStateTitle").textContent = hasSavedSheets ? "Selecione uma ficha salva." : "Nenhuma ficha encontrada.";
-  $("#emptyStateMessage").textContent = hasSavedSheets ? "Use a lista de fichas salvas ou clique em Nova Ficha para começar outra." : "Clique em Nova Ficha para começar.";
+  $("#emptyState").classList.add("hidden");
+  $("#backToLibraryBtn").classList.toggle("hidden", !hasUser || !hasSheet);
   $("#saveBtnTop").disabled = !hasUser || !hasSheet;
   $("#loadSelectedBtn").disabled = !hasUser || !$("#sheetSelect").value;
   $("#deleteBtn").disabled = !hasUser || !state?.id;
@@ -245,12 +254,14 @@ function updateWorkspaceState() {
 
 function clearActiveSheet() {
   state = null;
+  selectedLibraryId = null;
   isDirty = false;
   pendingSave = false;
   clearTimeout(autosaveTimer);
   $("#sheetSelect").value = "";
   updateWorkspaceState();
   updateFloatingHud();
+  renderizarLivros(sheetList);
 }
 
 function hydrateForm() {
@@ -463,10 +474,12 @@ async function refreshAuthState() {
   if (!user) {
     clearActiveSheet();
     $("#sheetSelect").innerHTML = `<option value="">Fichas salvas</option>`;
+    $("#bookGrid").innerHTML = "";
+    $("#readingPanel").classList.add("hidden");
     updateWorkspaceState();
     return;
   }
-  await listarFichas();
+  await carregarBiblioteca();
   updateWorkspaceState();
 }
 
@@ -503,8 +516,9 @@ async function salvarFicha(options = {}) {
     state.id = data.id;
     isDirty = false;
     if (!silent) {
-      await listarFichas();
+      await carregarBiblioteca();
       $("#sheetSelect").value = state.id;
+      selectedLibraryId = state.id;
       updateWorkspaceState();
       toast(isUpdate ? "Ficha atualizada com sucesso." : "Ficha salva com sucesso.");
     }
@@ -540,6 +554,7 @@ async function carregarFicha(id) {
   setLoading(false);
   if (error) return handleSupabaseError(error);
   state = fromRow(data);
+  selectedLibraryId = state.id;
   isDirty = false;
   hydrateForm();
   renderAll();
@@ -607,15 +622,20 @@ async function excluirFicha(id) {
   sheetList = sheetList.filter((ficha) => ficha.id !== fichaId);
   if (state?.id === fichaId) {
     state = null;
+    selectedLibraryId = null;
     isDirty = false;
   }
-  await listarFichas();
+  await carregarBiblioteca();
   updateWorkspaceState();
   toast("Ficha excluída com sucesso.");
 }
 
 async function excluirFichaSupabase(id = state?.id) {
   return abrirModalExclusao(id);
+}
+
+async function carregarBiblioteca() {
+  return listarFichas();
 }
 
 async function listarFichas() {
@@ -632,6 +652,7 @@ async function listarFichas() {
   sheetList = filtrarFichasPersistidas(data || []);
   if (!sheetList.length) {
     select.innerHTML = `<option value="">Nenhuma ficha encontrada</option>`;
+    renderizarLivros([]);
     if (!state?.id) clearActiveSheet();
     return sheetList;
   }
@@ -641,12 +662,139 @@ async function listarFichas() {
   } else if (!state?.id) {
     select.value = "";
   }
+  renderizarLivros(sheetList);
   updateWorkspaceState();
   return sheetList;
 }
 
 async function listarFichasSupabase() {
   return listarFichas();
+}
+
+async function renderizarLivros(fichas) {
+  const grid = $("#bookGrid");
+  if (!grid) return;
+  if (!fichas.length) {
+    mostrarEstadoVazio();
+    preencherPainelLeitura(null);
+    return;
+  }
+  grid.innerHTML = fichas.map((ficha, index) => {
+    const personagem = ficha.personagem || {};
+    const nome = ficha.nome || personagem.identidade?.nome || "Livro sem titulo";
+    const classe = ficha.classe || personagem.identidade?.classe || "Classe indefinida";
+    const nivel = ficha.nivel || personagem.identidade?.nivel || 1;
+    const tema = ficha.tema || personagem.identidade?.tema || "Tema oculto";
+    return `
+      <button class="arcane-book ${selectedLibraryId === ficha.id ? "selected" : ""}" type="button" data-book-id="${ficha.id}" style="animation-delay:${Math.min(index * 45, 360)}ms">
+        <span class="book-rune"><i class="ti ti-book-2"></i></span>
+        <span class="book-title">
+          <strong>${escapeHtml(nome)}</strong>
+          <span>${escapeHtml(classe)}</span>
+        </span>
+        <span class="book-meta">
+          <span>Nv. ${escapeHtml(nivel)}</span>
+          <span>${escapeHtml(tema)}</span>
+        </span>
+      </button>
+    `;
+  }).join("");
+  const selected = sheetList.find((ficha) => ficha.id === selectedLibraryId) || sheetList[0];
+  if (!selectedLibraryId && selected) selectedLibraryId = selected.id;
+  preencherPainelLeitura(selected);
+}
+
+async function abrirLivroFicha(id) {
+  selectedLibraryId = id;
+  const ficha = sheetList.find((item) => item.id === id);
+  preencherPainelLeitura(ficha || null);
+  renderizarLivros(sheetList);
+}
+
+function criarNovoLivro() {
+  novaFicha();
+}
+
+function excluirFichaComConfirmacao(id) {
+  abrirModalExclusao(id);
+}
+
+function mostrarEstadoVazio() {
+  $("#bookGrid").innerHTML = `
+    <div class="library-empty">
+      <h3>Nenhuma ficha encontrada.</h3>
+      <p>Clique em Novo Livro para criar sua primeira ficha.</p>
+    </div>
+  `;
+  $("#readingPanel").classList.add("hidden");
+}
+
+function mostrarToast(mensagem) {
+  toast(mensagem);
+}
+
+async function voltarParaBiblioteca() {
+  state = null;
+  isDirty = false;
+  clearTimeout(autosaveTimer);
+  await carregarBiblioteca();
+  updateWorkspaceState();
+  updateFloatingHud();
+}
+
+function preencherPainelLeitura(ficha) {
+  const panel = $("#readingPanel");
+  if (!ficha) {
+    panel.classList.add("hidden");
+    return;
+  }
+  const resumo = resumoFicha(ficha);
+  panel.classList.remove("hidden");
+  $("#readingName").textContent = resumo.nome;
+  $("#readingClass").textContent = resumo.classe;
+  $("#readingLevel").textContent = `Nv. ${resumo.nivel}`;
+  $("#readingTheme").textContent = resumo.tema;
+  $("#readingOrigin").textContent = resumo.origem;
+  $("#readingDefense").textContent = resumo.defesa;
+  atualizarRecursoLeitura("Pv", resumo.pv);
+  atualizarRecursoLeitura("Pm", resumo.pm);
+  atualizarRecursoLeitura("Pf", resumo.pf);
+  $("#readingMemories").innerHTML = resumo.memorias.length
+    ? resumo.memorias.map((memoria) => `<span>${escapeHtml(memoria)}</span>`).join("")
+    : "<p>Nenhuma memoria registrada.</p>";
+}
+
+function atualizarRecursoLeitura(label, recurso) {
+  const atual = Number(recurso.atual || 0);
+  const maximo = Number(recurso.maximo || 0);
+  const percent = maximo > 0 ? Math.max(0, Math.min(100, Math.round((atual / maximo) * 100))) : 0;
+  $(`#reading${label}Text`).textContent = `${atual}/${maximo}`;
+  $(`#reading${label}Fill`).style.width = `${percent}%`;
+}
+
+async function abrirFichaSelecionadaCompleta() {
+  if (!selectedLibraryId) return toast("Selecione um livro para abrir.", "danger");
+  await carregarFicha(selectedLibraryId);
+}
+
+function resumoFicha(ficha) {
+  const personagem = ficha.personagem || {};
+  const identidade = personagem.identidade || {};
+  const combate = personagem.combate || {};
+  const recursosFicha = personagem.recursos || {};
+  const memorias = Array.isArray(personagem.memorias) ? personagem.memorias.slice(0, 3) : [];
+  return {
+    nome: ficha.nome || identidade.nome || "Livro sem titulo",
+    classe: ficha.classe || identidade.classe || "Classe indefinida",
+    nivel: ficha.nivel || identidade.nivel || 1,
+    tema: ficha.tema || identidade.tema || "Tema oculto",
+    origem: ficha.origem || identidade.origem || "Origem desconhecida",
+    defesa: combate.defesa ?? "-",
+    pv: recursosFicha.pv || { atual: 0, maximo: 0 },
+    pm: recursosFicha.pm || { atual: 0, maximo: 0 },
+    pf: recursosFicha.pf || { atual: 0, maximo: 0 },
+    memorias: memorias.map((memoria) => memoria.titulo || memoria.codigo || memoria.habilidade || "Memoria sem titulo")
+  };
 }
 
 function filtrarFichasPersistidas(fichas) {
@@ -699,11 +847,13 @@ function fichaTemConteudo(ficha) {
 
 function novaFicha() {
   state = defaultSheet();
+  selectedLibraryId = null;
   isDirty = false;
   hydrateForm();
   renderAll();
   $("#sheetSelect").value = "";
-  toast("Nova ficha pronta.");
+  updateWorkspaceState();
+  toast("Novo livro pronto para preencher.");
 }
 
 function resetarFicha() {
@@ -1297,6 +1447,14 @@ window.carregarFichaSupabase = carregarFichaSupabase;
 window.atualizarFichaSupabase = atualizarFichaSupabase;
 window.excluirFichaSupabase = excluirFichaSupabase;
 window.listarFichasSupabase = listarFichasSupabase;
+window.carregarBiblioteca = carregarBiblioteca;
+window.renderizarLivros = renderizarLivros;
+window.abrirLivroFicha = abrirLivroFicha;
+window.criarNovoLivro = criarNovoLivro;
+window.excluirFichaComConfirmacao = excluirFichaComConfirmacao;
+window.mostrarEstadoVazio = mostrarEstadoVazio;
+window.mostrarToast = mostrarToast;
+window.voltarParaBiblioteca = voltarParaBiblioteca;
 window.initFloatingHud = initFloatingHud;
 window.updateFloatingHud = updateFloatingHud;
 window.toggleFloatingHud = toggleFloatingHud;

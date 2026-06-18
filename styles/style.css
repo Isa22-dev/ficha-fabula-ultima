@@ -909,6 +909,343 @@ label,
   color: var(--muted);
 }
 
+.arcane-library {
+  position: relative;
+  min-height: calc(100vh - 122px);
+  padding: clamp(18px, 3vw, 34px);
+  border: 1px solid rgba(216, 181, 109, 0.22);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 16% 12%, rgba(216, 181, 109, 0.12), transparent 28%),
+    radial-gradient(circle at 82% 18%, rgba(155, 93, 229, 0.14), transparent 30%),
+    linear-gradient(135deg, #0a0710 0%, #120b19 48%, #171020 100%);
+  box-shadow: var(--shadow), inset 0 0 44px rgba(216, 181, 109, 0.06);
+  overflow: hidden;
+  animation: panelIn 0.32s ease both;
+}
+
+.arcane-library::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, rgba(233, 220, 194, 0.34) 0 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(0, 201, 167, 0.26) 0 1px, transparent 1.5px);
+  background-position: 0 0, 34px 42px;
+  background-size: 92px 92px, 126px 126px;
+  opacity: 0.26;
+  animation: arcaneStars 18s linear infinite;
+}
+
+.library-header,
+.library-layout {
+  position: relative;
+  z-index: 1;
+}
+
+.library-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.library-header h2 {
+  margin: 0;
+  color: #d8b56d;
+  font-size: clamp(2rem, 4vw, 3.8rem);
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 800;
+}
+
+.library-header p:not(.eyebrow) {
+  margin: 6px 0 0;
+  color: #e9dcc2;
+}
+
+.library-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 390px);
+  gap: 22px;
+  align-items: start;
+}
+
+.book-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 18px;
+}
+
+.arcane-book {
+  position: relative;
+  min-height: 230px;
+  display: grid;
+  align-content: space-between;
+  gap: 16px;
+  padding: 18px 16px 18px 24px;
+  border: 1px solid rgba(216, 181, 109, 0.28);
+  border-radius: 8px;
+  color: #e9dcc2;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.34) 0 12px, transparent 12px),
+    linear-gradient(145deg, rgba(23, 16, 32, 0.96), rgba(72, 35, 92, 0.82));
+  box-shadow: 0 22px 42px rgba(0, 0, 0, 0.28), inset 7px 0 0 rgba(216, 181, 109, 0.18);
+  cursor: pointer;
+  overflow: hidden;
+  text-align: left;
+  animation: bookEnter 0.42s ease both;
+  transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+.arcane-book::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgba(216, 181, 109, 0.22);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.arcane-book::after {
+  content: "";
+  position: absolute;
+  inset: -40% -80%;
+  background: linear-gradient(120deg, transparent, rgba(216, 181, 109, 0.22), transparent);
+  transform: translateX(-70%);
+  transition: transform 0.38s ease;
+}
+
+.arcane-book:hover {
+  transform: translateY(-10px) rotate(-1deg);
+  border-color: rgba(216, 181, 109, 0.72);
+  box-shadow: 0 30px 62px rgba(0, 0, 0, 0.36), 0 0 28px rgba(216, 181, 109, 0.2);
+}
+
+.arcane-book:hover::after {
+  transform: translateX(70%);
+}
+
+.arcane-book.selected {
+  border-color: #d8b56d;
+  box-shadow: 0 30px 62px rgba(0, 0, 0, 0.38), 0 0 34px rgba(216, 181, 109, 0.34);
+}
+
+.book-title,
+.book-meta {
+  position: relative;
+  z-index: 1;
+}
+
+.book-title strong {
+  display: block;
+  color: #e9dcc2;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.18rem;
+  line-height: 1.15;
+}
+
+.book-title span,
+.book-meta span {
+  display: block;
+  color: rgba(233, 220, 194, 0.68);
+  font-size: 0.78rem;
+}
+
+.book-rune {
+  position: relative;
+  z-index: 1;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(216, 181, 109, 0.42);
+  border-radius: 50%;
+  color: #d8b56d;
+  background: rgba(216, 181, 109, 0.08);
+  box-shadow: 0 0 18px rgba(216, 181, 109, 0.18);
+}
+
+.reading-panel {
+  position: sticky;
+  top: 96px;
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid rgba(216, 181, 109, 0.28);
+  border-radius: 8px;
+  background: rgba(23, 16, 32, 0.84);
+  color: #e9dcc2;
+  box-shadow: var(--shadow), 0 0 24px rgba(216, 181, 109, 0.12);
+  backdrop-filter: blur(16px);
+  animation: readingPanelIn 0.28s ease both;
+}
+
+.reading-panel h3 {
+  margin: 0;
+  color: #d8b56d;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.8rem;
+}
+
+.reading-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reading-tags span {
+  padding: 6px 9px;
+  border: 1px solid rgba(216, 181, 109, 0.28);
+  border-radius: 999px;
+  color: #e9dcc2;
+  background: rgba(216, 181, 109, 0.08);
+  font-size: 0.78rem;
+}
+
+.reading-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0;
+}
+
+.reading-stats div {
+  padding: 10px;
+  border: 1px solid rgba(233, 220, 194, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.reading-stats dt,
+.reading-resource span {
+  color: rgba(233, 220, 194, 0.62);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.reading-stats dd {
+  margin: 4px 0 0;
+  color: #e9dcc2;
+  font-weight: 800;
+}
+
+.reading-resource {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+}
+
+.reading-resource strong {
+  justify-self: end;
+  font-size: 0.82rem;
+}
+
+.reading-track {
+  grid-column: span 2;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.reading-fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.52s ease;
+  animation: arcaneBarLoad 0.62s ease both;
+}
+
+.reading-fill.pv { background: linear-gradient(90deg, #ff4655, #ff8f99); }
+.reading-fill.pm { background: linear-gradient(90deg, #00c9a7, #6fffe6); }
+.reading-fill.pf { background: linear-gradient(90deg, #9b5de5, #d8b56d); }
+
+.reading-memories h4 {
+  margin: 0 0 8px;
+  color: #d8b56d;
+}
+
+.reading-memories p,
+.reading-memories span {
+  display: block;
+  margin: 0;
+  color: rgba(233, 220, 194, 0.72);
+  font-size: 0.88rem;
+}
+
+.reading-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.library-empty {
+  min-height: 320px;
+  grid-column: 1 / -1;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 28px;
+  text-align: center;
+  border: 1px dashed rgba(216, 181, 109, 0.32);
+  border-radius: 8px;
+  background: rgba(23, 16, 32, 0.58);
+}
+
+.library-empty h3 {
+  margin: 0;
+  color: #d8b56d;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.8rem;
+}
+
+.library-empty p {
+  margin: 0;
+  color: #e9dcc2;
+}
+
+@keyframes arcaneStars {
+  to {
+    background-position: 92px 92px, 160px 168px;
+  }
+}
+
+@keyframes bookEnter {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes readingPanelIn {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes arcaneBarLoad {
+  from {
+    transform: scaleX(0);
+    transform-origin: left center;
+  }
+  to {
+    transform: scaleX(1);
+    transform-origin: left center;
+  }
+}
+
 @keyframes panelIn {
   from {
     opacity: 0;
@@ -1779,12 +2116,17 @@ select:focus {
   .auth-panel,
   .dice-layout,
   .preview-body,
-  .preview-notes {
+  .preview-notes,
+  .library-layout {
     grid-template-columns: 1fr;
   }
 
   .preview-panel.wide {
     grid-column: span 1;
+  }
+
+  .reading-panel {
+    position: static;
   }
 }
 
@@ -1849,7 +2191,8 @@ select:focus {
   }
 
   .topbar,
-  .section-head {
+  .section-head,
+  .library-header {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -1857,6 +2200,23 @@ select:focus {
   .top-actions,
   .compact-select {
     width: 100%;
+  }
+
+  .book-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .arcane-book {
+    min-height: 180px;
+  }
+
+  .reading-actions,
+  .reading-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .reading-actions > * {
+    min-height: 46px;
   }
 
   .identity-grid,
