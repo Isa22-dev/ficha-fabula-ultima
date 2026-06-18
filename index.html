@@ -17,38 +17,14 @@
       <div class="fusion-orb fusion-orb-c"></div>
       <div class="fusion-scanline"></div>
     </div>
-    <div class="app-shell">
-      <aside class="sidebar">
-        <div class="brand">
-          <span class="brand-mark">RPG</span>
-          <div>
-            <strong>Fichas de RPG</strong>
-            <small>Biblioteca de fichas</small>
-          </div>
-        </div>
-        <nav class="nav-tabs" aria-label="Secoes da ficha">
-          <button class="nav-tab" type="button" id="libraryNavBtn"><i class="ti ti-books"></i><span>Biblioteca</span></button>
-          <button class="nav-tab active" data-tab="identidade"><i class="ti ti-id"></i><span>Identidade</span></button>
-          <button class="nav-tab" data-tab="recursos"><i class="ti ti-heart-bolt"></i><span>Recursos</span></button>
-          <button class="nav-tab" data-tab="atributos"><i class="ti ti-dice-5"></i><span>Atributos</span></button>
-          <button class="nav-tab" data-tab="memorias"><i class="ti ti-brain"></i><span>Habilidades</span></button>
-          <button class="nav-tab" data-tab="equipamentos"><i class="ti ti-sword"></i><span>Equipamentos</span></button>
-          <button class="nav-tab" data-tab="lacos"><i class="ti ti-link"></i><span>Memórias</span></button>
-          <button class="nav-tab" data-tab="visualizacao"><i class="ti ti-file-description"></i><span>Visualizacao</span></button>
-          <button class="nav-tab" data-tab="configuracoes"><i class="ti ti-settings"></i><span>Configuracoes</span></button>
-        </nav>
-      </aside>
-
-      <main class="main">
+    <section id="library-screen" class="screen">
+      <main class="main library-main">
         <header class="topbar">
-          <button class="icon-button mobile-menu" id="mobileMenu" title="Abrir menu"><i class="ti ti-menu-2"></i></button>
           <div>
             <h1>Fichas de RPG</h1>
           </div>
           <div class="top-actions">
             <button class="icon-button" id="newSheetBtn" title="Nova ficha"><i class="ti ti-file-plus"></i></button>
-            <button class="icon-button" id="saveBtnTop" title="Salvar"><i class="ti ti-device-floppy"></i></button>
-            <button class="icon-button" type="button" id="settingsTopBtn" title="Configuracoes" aria-label="Configuracoes"><i class="ti ti-settings"></i></button>
           </div>
         </header>
 
@@ -127,6 +103,43 @@
           <p id="emptyStateMessage">Clique em Nova Ficha para começar.</p>
           <button class="primary-button" type="button" id="emptyNewSheetBtn"><i class="ti ti-file-plus"></i>Nova Ficha</button>
         </section>
+      </main>
+    </section>
+
+    <section id="sheet-editor-screen" class="app-shell hidden">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">RPG</span>
+          <div>
+            <strong>Fichas de RPG</strong>
+            <small>Biblioteca de fichas</small>
+          </div>
+        </div>
+        <nav class="nav-tabs" aria-label="Secoes da ficha">
+          <button class="nav-tab" type="button" id="libraryNavBtn"><i class="ti ti-books"></i><span>Biblioteca</span></button>
+          <button class="nav-tab active" data-tab="identidade"><i class="ti ti-id"></i><span>Identidade</span></button>
+          <button class="nav-tab" data-tab="recursos"><i class="ti ti-heart-bolt"></i><span>Recursos</span></button>
+          <button class="nav-tab" data-tab="atributos"><i class="ti ti-dice-5"></i><span>Atributos</span></button>
+          <button class="nav-tab" data-tab="memorias"><i class="ti ti-brain"></i><span>Habilidades</span></button>
+          <button class="nav-tab" data-tab="equipamentos"><i class="ti ti-sword"></i><span>Equipamentos</span></button>
+          <button class="nav-tab" data-tab="lacos"><i class="ti ti-link"></i><span>Memórias</span></button>
+          <button class="nav-tab" data-tab="visualizacao"><i class="ti ti-file-description"></i><span>Visualizacao</span></button>
+          <button class="nav-tab" data-tab="configuracoes"><i class="ti ti-settings"></i><span>Configuracoes</span></button>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <button class="icon-button mobile-menu" id="mobileMenu" title="Abrir menu"><i class="ti ti-menu-2"></i></button>
+          <div>
+            <h1>Fichas de RPG</h1>
+          </div>
+          <div class="top-actions">
+            <button class="icon-button" id="newSheetBtnEditor" title="Nova ficha"><i class="ti ti-file-plus"></i></button>
+            <button class="icon-button" id="saveBtnTop" title="Salvar"><i class="ti ti-device-floppy"></i></button>
+            <button class="icon-button" type="button" id="settingsTopBtn" title="Configuracoes" aria-label="Configuracoes"><i class="ti ti-settings"></i></button>
+          </div>
+        </header>
 
         <form class="sheet-form hidden" id="sheetForm">
           <button class="back-library-button hidden" type="button" id="backToLibraryBtn"><i class="ti ti-arrow-left"></i>Voltar para Biblioteca</button>
@@ -255,7 +268,7 @@
           </section>
         </form>
       </main>
-    </div>
+    </section>
 
     <div class="toast-stack" id="toastStack"></div>
     <div class="modal-backdrop hidden" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">

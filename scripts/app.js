@@ -179,6 +179,7 @@ function bindEvents() {
   $("#saveBtn")?.addEventListener("click", () => salvarFicha());
   $("#saveBtnTop").addEventListener("click", () => salvarFicha());
   $("#newSheetBtn").addEventListener("click", novaFicha);
+  $("#newSheetBtnEditor").addEventListener("click", novaFicha);
   $("#emptyNewSheetBtn").addEventListener("click", novaFicha);
   $("#newBookBtn").addEventListener("click", criarNovoLivro);
   $("#newSheetBtnSettings").addEventListener("click", novaFicha);
@@ -252,13 +253,17 @@ function updateWorkspaceState() {
   const hasUser = Boolean(user);
   const hasSheet = Boolean(state);
   const libraryVisible = hasUser && !hasSheet;
+  const editorVisible = hasUser && hasSheet;
+  $("#library-screen").classList.toggle("hidden", editorVisible);
+  $("#sheet-editor-screen").classList.toggle("hidden", !editorVisible);
   $("#arcaneLibrary").classList.toggle("hidden", !libraryVisible);
   if (libraryVisible) $$(".nav-tab").forEach((item) => item.classList.toggle("active", item.id === "libraryNavBtn"));
-  $("#sheetForm").classList.toggle("hidden", !hasUser || !hasSheet);
+  $("#sheetForm").classList.toggle("hidden", !editorVisible);
   $("#emptyState").classList.add("hidden");
-  $("#backToLibraryBtn").classList.toggle("hidden", !hasUser || !hasSheet);
-  $("#saveBtnTop").disabled = !hasUser || !hasSheet;
-  $("#deleteBtn").disabled = !hasUser || !state?.id;
+  $("#backToLibraryBtn").classList.toggle("hidden", !editorVisible);
+  $("#saveBtnTop").disabled = !editorVisible;
+  $("#newSheetBtn").disabled = !hasUser;
+  $("#deleteBtn").disabled = !editorVisible || !state?.id;
   $("#exportBtn").disabled = !hasSheet;
   $("#resetBtn").disabled = !hasSheet;
 }
@@ -896,6 +901,10 @@ function fichaTemConteudo(ficha) {
 }
 
 function novaFicha() {
+  if (!user) {
+    toast("Entre para criar uma nova ficha.", "danger");
+    return;
+  }
   state = defaultSheet();
   selectedLibraryId = null;
   isDirty = false;

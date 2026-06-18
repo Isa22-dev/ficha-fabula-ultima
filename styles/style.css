@@ -274,6 +274,15 @@ button {
   min-height: 100vh;
 }
 
+.screen {
+  min-height: 100vh;
+}
+
+.library-main {
+  width: min(1400px, 100%);
+  margin: 0 auto;
+}
+
 .sidebar {
   position: sticky;
   top: 0;
