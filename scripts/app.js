@@ -100,43 +100,117 @@ function bindNavigation() {
       if (tab === "visualizacao") renderPreview();
     });
   });
-  $("#mobileMenu").addEventListener("click", toggleDrawer);
+  initDrawerMenu();
 }
 
-function setDrawerState(isOpen) {
-  const drawer = document.getElementById("drawerMenu");
-  const icon = document.getElementById("drawerIcon");
+function getDrawerElements() {
+  return {
+    toggle: document.getElementById("drawerToggle"),
+    icon: document.getElementById("drawerIcon"),
+    menu: document.getElementById("drawerMenu"),
+    overlay: document.getElementById("drawerOverlay")
+  };
+}
 
-  if (!drawer) {
-    console.error("drawerMenu não encontrado");
-    return;
+function openDrawer() {
+  const { icon, menu, overlay } = getDrawerElements();
+
+  if (!menu || !overlay) return;
+
+  drawerOpen = true;
+
+  menu.classList.add("open");
+  overlay.classList.add("active");
+
+  if (icon) {
+    icon.classList.remove("ti-menu-2");
+    icon.classList.add("ti-x");
   }
+}
 
-  drawerOpen = isOpen;
+function closeDrawer() {
+  const { icon, menu, overlay } = getDrawerElements();
 
-  if (drawerOpen) {
-    drawer.classList.add("open");
-    drawer.classList.remove("closed");
-    if (icon) {
-      icon.classList.remove("ti-menu-2");
-      icon.classList.add("ti-x");
-    }
-  } else {
-    drawer.classList.remove("open");
-    drawer.classList.add("closed");
-    if (icon) {
-      icon.classList.remove("ti-x");
-      icon.classList.add("ti-menu-2");
-    }
+  if (!menu || !overlay) return;
+
+  drawerOpen = false;
+
+  menu.classList.remove("open");
+  overlay.classList.remove("active");
+
+  if (icon) {
+    icon.classList.remove("ti-x");
+    icon.classList.add("ti-menu-2");
   }
 }
 
 function toggleDrawer() {
-  setDrawerState(!drawerOpen);
+  if (drawerOpen) {
+    closeDrawer();
+  } else {
+    openDrawer();
+  }
 }
 
-function closeDrawer() {
-  setDrawerState(false);
+function switchPanel(panel) {
+  const targetPanel = panel === "habilidades" ? "memorias" : panel;
+
+  if (targetPanel === "biblioteca") {
+    voltarParaBiblioteca();
+    return;
+  }
+
+  if (targetPanel === "visualizacao") {
+    ativarAba("visualizacao");
+    renderPreview();
+    return;
+  }
+
+  if (targetPanel === "configuracoes") {
+    abrirConfiguracoes();
+    return;
+  }
+
+  if (targetPanel) {
+    ativarAba(targetPanel);
+    if (targetPanel === "visualizacao") renderPreview();
+  }
+}
+
+function initDrawerMenu() {
+  const { toggle, overlay, menu } = getDrawerElements();
+
+  if (!toggle || !overlay || !menu) {
+    console.error("Elementos do menu gaveta não encontrados.");
+    return;
+  }
+
+  toggle.addEventListener("click", function (event) {
+    event.stopPropagation();
+    toggleDrawer();
+  });
+
+  overlay.addEventListener("click", function () {
+    closeDrawer();
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      closeDrawer();
+    }
+  });
+
+  menu.querySelectorAll(".drawer-item").forEach(function (item) {
+    item.addEventListener("click", function () {
+      const panel = item.dataset.panel;
+
+      if (panel && typeof switchPanel === "function") {
+        switchPanel(panel);
+      }
+
+      closeDrawer();
+    });
+  });
 }
 
 function abrirConfiguracoes() {
@@ -238,7 +312,6 @@ function bindEvents() {
   $("#profilePhotoInput").addEventListener("change", importarFotoPerfil);
   $("#removePhotoBtn").addEventListener("click", removerFotoPerfil);
   $("#settingsTopBtn").addEventListener("click", abrirConfiguracoes);
-  $("#libraryNavBtn").addEventListener("click", voltarParaBiblioteca);
   $("#backToLibraryBtn").addEventListener("click", voltarParaBiblioteca);
   $("#openFullSheetBtn").addEventListener("click", abrirFichaSelecionadaCompleta);
   $("#addMemory").addEventListener("click", addMemory);
@@ -409,7 +482,7 @@ function renderBonds() {
       </select></label>
       <label>Notas<textarea data-list="lacos" data-index="${index}" data-key="notas">${escapeHtml(item.notas)}</textarea></label>
     </article>
-  `).join("") || skeleton("Nenhum laco definido.");
+  `).join("") || skeleton("Nenhum laço registrado.<br>Clique em Novo Laço para criar o primeiro vínculo do personagem.");
 }
 
 function addMemory() {
@@ -853,7 +926,7 @@ function preencherPainelLeitura(ficha) {
   atualizarRecursoLeitura("Pf", resumo.pf);
   $("#readingMemories").innerHTML = resumo.memorias.length
     ? resumo.memorias.map((memoria) => `<span>${escapeHtml(memoria)}</span>`).join("")
-    : "<p>Nenhuma memoria registrada.</p>";
+    : "<p>Nenhum laço registrado.</p>";
 }
 
 function atualizarRecursoLeitura(label, recurso) {
@@ -885,7 +958,7 @@ function resumoFicha(ficha) {
     pv: recursosFicha.pv || { atual: 0, maximo: 0 },
     pm: recursosFicha.pm || { atual: 0, maximo: 0 },
     pf: recursosFicha.pf || { atual: 0, maximo: 0 },
-    memorias: memorias.map((memoria) => memoria.titulo || memoria.codigo || memoria.habilidade || "Memoria sem titulo")
+    memorias: memorias.map((memoria) => memoria.titulo || memoria.codigo || memoria.habilidade || "Laço sem título")
   };
 }
 
@@ -1177,13 +1250,13 @@ function renderPreview() {
         `).join("") || "<p>Nenhum equipamento.</p>"}</div>
       </section>
       <section class="preview-panel">
-        <h3>Lacos</h3>
+        <h3>Laços</h3>
         <div class="preview-list compact">${state.lacos.map((l) => `
           <article class="preview-bond" style="--bond:${bondTypes[l.tipo] || bondTypes.Neutro}">
-            <header><strong>${escapeHtml(l.nome || "Laco")}</strong><span>${escapeHtml(l.tipo || "Neutro")}</span></header>
+            <header><strong>${escapeHtml(l.nome || "Laço")}</strong><span>${escapeHtml(l.tipo || "Neutro")}</span></header>
             <small>${escapeHtml(l.notas || "Sem notas.")}</small>
           </article>
-        `).join("") || "<p>Nenhum laco.</p>"}</div>
+        `).join("") || "<p>Nenhum laço.</p>"}</div>
       </section>
       <section class="preview-panel wide">
         <h3>Notas do personagem</h3>

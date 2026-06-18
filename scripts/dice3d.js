@@ -5,6 +5,10 @@
 
 let rollHistory = [];
 
+function getSessionDiceResult() {
+  return document.getElementById('sessionDiceResult') || document.getElementById('diceResult');
+}
+
 /**
  * Rola um dado
  * @param {number} lados - Número de lados do dado
@@ -15,27 +19,18 @@ function rollDice(lados) {
   const timestamp = new Date().toLocaleTimeString('pt-BR');
 
   // Atualiza o display do resultado
-  document.getElementById('diceResult').textContent = `Resultado: ${resultado}`;
+  getSessionDiceResult().textContent = `Resultado: ${resultado}`;
   document.getElementById('diceBox').textContent = resultado;
-
-  // Adiciona ao histórico
-  rollHistory.push({
-    tipo: tipo,
-    resultado: resultado,
-    timestamp: timestamp
-  });
-
-  // Limita a 50 itens
-  if (rollHistory.length > 50) {
-    rollHistory.shift();
-  }
-
-  // Atualiza o histórico na tela
-  updateHistoryDisplay();
 
   // Registra no painel de sessão se disponível
   if (window.SessionPanel && typeof window.SessionPanel.registerRollResult === 'function') {
     window.SessionPanel.registerRollResult(tipo, 1, [resultado], resultado);
+  } else {
+    addLocalRoll({
+      tipo: tipo,
+      resultado: resultado,
+      timestamp: timestamp
+    });
   }
 }
 
@@ -55,28 +50,30 @@ function rollMultipleDice(lados, quantidade) {
 
   // Atualiza o display
   const detalhe = resultados.join(' + ');
-  document.getElementById('diceResult').textContent = `${tipo}: ${detalhe} = ${total}`;
+  getSessionDiceResult().textContent = `${tipo}: ${detalhe} = ${total}`;
 
-  // Adiciona ao histórico
-  rollHistory.push({
-    tipo: tipo,
-    resultado: total,
-    timestamp: timestamp,
-    detalhes: resultados
-  });
+  // Registra no painel de sessão se disponível
+  if (window.SessionPanel && typeof window.SessionPanel.registerRollResult === 'function') {
+    window.SessionPanel.registerRollResult(tipo, quantidade, resultados, total);
+  } else {
+    addLocalRoll({
+      tipo: tipo,
+      resultado: total,
+      timestamp: timestamp,
+      detalhes: resultados
+    });
+  }
+}
+
+function addLocalRoll(roll) {
+  rollHistory.push(roll);
 
   // Limita a 50 itens
   if (rollHistory.length > 50) {
     rollHistory.shift();
   }
 
-  // Atualiza o histórico na tela
   updateHistoryDisplay();
-
-  // Registra no painel de sessão se disponível
-  if (window.SessionPanel && typeof window.SessionPanel.registerRollResult === 'function') {
-    window.SessionPanel.registerRollResult(tipo, quantidade, resultados, total);
-  }
 }
 
 /**
@@ -111,10 +108,14 @@ function updateHistoryDisplay() {
  */
 function clearHistory() {
   if (confirm('Tem certeza que quer limpar o histórico?')) {
-    rollHistory = [];
-    updateHistoryDisplay();
-    document.getElementById('diceResult').textContent = 'Resultado: —';
+    clearLocalHistory();
+    getSessionDiceResult().textContent = 'Resultado: —';
   }
+}
+
+function clearLocalHistory() {
+  rollHistory = [];
+  updateHistoryDisplay();
 }
 
 /**
@@ -180,8 +181,13 @@ const Dice3D = {
       detalhes: resultados
     });
     updateHistoryDisplay();
+  },
+  clearHistory: () => {
+    rollHistory = [];
   }
 };
+
+window.Dice3D = Dice3D;
 
 // Inicializa automaticamente
 if (document.readyState === 'loading') {

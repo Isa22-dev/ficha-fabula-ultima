@@ -87,7 +87,7 @@
                 <div class="reading-track"><div class="reading-fill pf" id="readingPfFill"></div></div>
               </div>
               <div class="reading-memories">
-                <h4>Memorias principais</h4>
+                <h4>Laços principais</h4>
                 <div id="readingMemories"></div>
               </div>
               <div class="reading-actions">
@@ -107,7 +107,7 @@
     </section>
 
     <section id="sheet-editor-screen" class="app-shell hidden">
-      <aside class="sidebar" id="drawerMenu">
+      <aside class="sidebar drawer-menu" id="drawerMenu">
         <div class="brand">
           <span class="brand-mark">RPG</span>
           <div>
@@ -116,21 +116,25 @@
           </div>
         </div>
         <nav class="nav-tabs" aria-label="Secoes da ficha">
-          <button class="nav-tab" type="button" id="libraryNavBtn"><i class="ti ti-books"></i><span>Biblioteca</span></button>
-          <button class="nav-tab active" data-tab="identidade"><i class="ti ti-id"></i><span>Identidade</span></button>
-          <button class="nav-tab" data-tab="recursos"><i class="ti ti-heart-bolt"></i><span>Recursos</span></button>
-          <button class="nav-tab" data-tab="atributos"><i class="ti ti-dice-5"></i><span>Atributos</span></button>
-          <button class="nav-tab" data-tab="memorias"><i class="ti ti-brain"></i><span>Habilidades</span></button>
-          <button class="nav-tab" data-tab="equipamentos"><i class="ti ti-sword"></i><span>Equipamentos</span></button>
-          <button class="nav-tab" data-tab="lacos"><i class="ti ti-link"></i><span>Memórias</span></button>
-          <button class="nav-tab" data-tab="visualizacao"><i class="ti ti-file-description"></i><span>Visualizacao</span></button>
-          <button class="nav-tab" data-tab="configuracoes"><i class="ti ti-settings"></i><span>Configuracoes</span></button>
+          <button class="nav-tab drawer-item" type="button" id="libraryNavBtn" data-panel="biblioteca"><i class="ti ti-books"></i><span>Biblioteca</span></button>
+          <button class="nav-tab drawer-item active" data-tab="identidade" data-panel="identidade"><i class="ti ti-id"></i><span>Identidade</span></button>
+          <button class="nav-tab drawer-item" data-tab="recursos" data-panel="recursos"><i class="ti ti-heart-bolt"></i><span>Recursos</span></button>
+          <button class="nav-tab drawer-item" data-tab="atributos" data-panel="atributos"><i class="ti ti-dice-5"></i><span>Atributos</span></button>
+          <button class="nav-tab drawer-item" data-tab="memorias" data-panel="habilidades"><i class="ti ti-brain"></i><span>Habilidades</span></button>
+          <button class="nav-tab drawer-item" data-tab="equipamentos" data-panel="equipamentos"><i class="ti ti-sword"></i><span>Equipamentos</span></button>
+          <button class="nav-tab drawer-item" data-tab="lacos" data-panel="lacos"><i class="ti ti-link"></i><span>Laços</span></button>
+          <button class="nav-tab drawer-item" data-tab="dados" data-panel="dados"><i class="ti ti-dice-5"></i><span>Dados</span></button>
+          <button class="nav-tab drawer-item" data-tab="visualizacao" data-panel="visualizacao"><i class="ti ti-file-description"></i><span>Visualizacao</span></button>
+          <button class="nav-tab drawer-item" data-tab="configuracoes" data-panel="configuracoes"><i class="ti ti-settings"></i><span>Configuracoes</span></button>
         </nav>
       </aside>
+      <div id="drawerOverlay" class="drawer-overlay"></div>
 
       <main class="main">
         <header class="topbar">
-          <button class="icon-button mobile-menu" id="mobileMenu" title="Abrir menu"><i class="ti ti-menu-2" id="drawerIcon"></i></button>
+          <button id="drawerToggle" class="drawer-btn" type="button" aria-label="Abrir menu">
+            <i id="drawerIcon" class="ti ti-menu-2"></i>
+          </button>
           <div>
             <h1>Fichas de RPG</h1>
           </div>
@@ -209,8 +213,8 @@
 
           <section class="tab-panel" id="lacos">
             <div class="section-head">
-              <div><p class="eyebrow">Memórias</p><h2>Memórias e vínculos</h2></div>
-              <button class="primary-button" type="button" id="addBond"><i class="ti ti-plus"></i>Adicionar</button>
+              <div><p class="eyebrow">Laços</p><h2>Laços e vínculos</h2></div>
+              <button class="primary-button" type="button" id="addBond"><i class="ti ti-plus"></i>Adicionar Laço</button>
             </div>
             <div class="card-grid" id="bondList"></div>
           </section>
@@ -287,6 +291,16 @@
         </div>
       </div>
     </div>
+    <div class="modal-backdrop hidden" id="clearHistoryModal" role="dialog" aria-modal="true" aria-labelledby="clearHistoryModalTitle">
+      <div class="confirm-modal">
+        <h2 id="clearHistoryModalTitle">Limpar Histórico</h2>
+        <p>Deseja realmente apagar todo o histórico de rolagens?</p>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" id="cancelClearHistoryBtn">Cancelar</button>
+          <button class="danger-button" type="button" id="confirmClearHistoryBtn">Limpar</button>
+        </div>
+      </div>
+    </div>
     <!-- Botão Flutuante de Sessão -->
     <button class="session-float-button" id="sessionFloatBtn" title="Abrir painel de sessão">
       <i class="ti ti-notes"></i>
@@ -345,12 +359,12 @@
               <button class="dice-btn" onclick="rollDice(20)">d20</button>
             </div>
 
-            <div class="dice-result" id="diceResult">Resultado: —</div>
+            <div class="dice-result" id="sessionDiceResult">Resultado: —</div>
 
             <div class="dice-history">
               <div class="history-header">
                 <h3>Histórico</h3>
-                <button class="ghost-button" type="button" id="clearHistoryBtn" onclick="clearDiceHistory()">
+                <button type="button" id="clearHistoryBtn" onclick="clearDiceHistory()">
                   Limpar Histórico
                 </button>
               </div>

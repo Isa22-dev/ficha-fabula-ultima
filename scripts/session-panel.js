@@ -15,6 +15,7 @@ const SessionPanel = (() => {
   let notesAutoSaveTimer = null;
   let supabaseEnabled = false;
   let currentUserId = null;
+  const diceHistory = [];
 
   // Elementos do DOM
   const elements = {
@@ -28,6 +29,9 @@ const SessionPanel = (() => {
     contents: null,
     historyList: null,
     clearHistoryBtn: null,
+    clearHistoryModal: null,
+    cancelClearHistoryBtn: null,
+    confirmClearHistoryBtn: null,
     diceResult: null,
     diceQuantity: null,
     diceBtns: null
@@ -42,6 +46,7 @@ const SessionPanel = (() => {
     bindEvents();
     initSupabase();
     loadNotes();
+    loadHistory();
     updateHistoryDisplay();
   }
 
@@ -166,9 +171,12 @@ const SessionPanel = (() => {
     elements.exportNotesBtn = document.getElementById("exportNotesBtn");
     elements.tabs = document.querySelectorAll(".session-tab");
     elements.contents = document.querySelectorAll(".session-tab-content");
-    elements.historyList = document.getElementById("historyList");
+    elements.historyList = document.getElementById("diceHistory");
     elements.clearHistoryBtn = document.getElementById("clearHistoryBtn");
-    elements.diceResult = document.getElementById("diceResult");
+    elements.clearHistoryModal = document.getElementById("clearHistoryModal");
+    elements.cancelClearHistoryBtn = document.getElementById("cancelClearHistoryBtn");
+    elements.confirmClearHistoryBtn = document.getElementById("confirmClearHistoryBtn");
+    elements.diceResult = document.getElementById("sessionDiceResult") || document.getElementById("diceResult");
     elements.diceQuantity = document.getElementById("diceQuantity");
     elements.diceBtns = document.querySelectorAll(".dice-btn");
   }
@@ -194,7 +202,11 @@ const SessionPanel = (() => {
     elements.exportNotesBtn.addEventListener("click", handleExportNotes);
 
     // Histórico
-    elements.clearHistoryBtn.addEventListener("click", handleClearHistory);
+    elements.cancelClearHistoryBtn?.addEventListener("click", closeClearHistoryModal);
+    elements.confirmClearHistoryBtn?.addEventListener("click", confirmClearHistory);
+    elements.clearHistoryModal?.addEventListener("click", (event) => {
+      if (event.target === elements.clearHistoryModal) closeClearHistoryModal();
+    });
 
     // Fechar ao clicar fora (opcional)
     document.addEventListener("click", handleOutsideClick);
@@ -331,8 +343,6 @@ const SessionPanel = (() => {
    * Adiciona uma rolagem ao histórico
    */
   function addToHistory(diceType, results, total) {
-    const history = getHistory();
-
     const entry = {
       id: Date.now(),
       dice: diceType,
@@ -341,39 +351,64 @@ const SessionPanel = (() => {
       time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
     };
 
-    history.unshift(entry);
+    diceHistory.unshift(entry);
 
     // Mantém apenas as últimas 50 rolagens
-    if (history.length > 50) {
-      history.pop();
+    if (diceHistory.length > 50) {
+      diceHistory.pop();
     }
 
-    localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(history));
+    localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(diceHistory));
     updateHistoryDisplay();
 
     return entry;
+  }
+
+  function loadHistory() {
+    let savedHistory = [];
+
+    try {
+      savedHistory = JSON.parse(localStorage.getItem(STORAGE_KEYS.HISTORY) || "[]");
+    } catch {
+      savedHistory = [];
+    }
+
+    diceHistory.length = 0;
+    diceHistory.push(...savedHistory.map(normalizeHistoryEntry).filter(Boolean));
+  }
+
+  function normalizeHistoryEntry(entry) {
+    if (!entry) return null;
+    if (Array.isArray(entry.results)) return entry;
+
+    return {
+      id: entry.id || Date.now(),
+      dice: entry.dice || entry.tipo || "d20",
+      results: Array.isArray(entry.detalhes) ? entry.detalhes : [Number(entry.resultado || entry.total || 0)],
+      total: Number(entry.total || entry.resultado || 0),
+      time: entry.time || entry.timestamp || new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+    };
   }
 
   /**
    * Obtém o histórico
    */
   function getHistory() {
-    const saved = localStorage.getItem(STORAGE_KEYS.HISTORY);
-    return saved ? JSON.parse(saved) : [];
+    return diceHistory;
   }
 
   /**
    * Atualiza a exibição do histórico
    */
   function updateHistoryDisplay() {
-    const history = getHistory();
+    if (!elements.historyList) return;
 
-    if (history.length === 0) {
+    if (diceHistory.length === 0) {
       elements.historyList.innerHTML = '<div class="history-empty">Nenhuma rolagem registrada.</div>';
       return;
     }
 
-    elements.historyList.innerHTML = history
+    elements.historyList.innerHTML = diceHistory
       .map(
         (entry) => `
       <div class="history-item ${entry.results.some((r) => r === 20 || r === 1) ? "highlight" : ""}">
@@ -392,36 +427,61 @@ const SessionPanel = (() => {
   /**
    * Limpa o histórico
    */
-  function handleClearHistory() {
-    if (confirm("Deseja realmente apagar todo o histórico de rolagens?")) {
-      localStorage.removeItem(STORAGE_KEYS.HISTORY);
-      updateHistoryDisplay();
-      toast("Histórico apagado com sucesso.", "info");
+  function openClearHistoryModal() {
+    if (elements.clearHistoryModal) {
+      elements.clearHistoryModal.classList.remove("hidden", "closing");
+      return;
     }
+
+    confirmClearHistory();
+  }
+
+  function closeClearHistoryModal() {
+    if (!elements.clearHistoryModal) return;
+    elements.clearHistoryModal.classList.add("hidden");
+  }
+
+  function confirmClearHistory() {
+    diceHistory.length = 0;
+
+    if (elements.historyList) {
+      elements.historyList.innerHTML = '<div class="history-empty">Nenhuma rolagem registrada.</div>';
+    }
+
+    localStorage.removeItem(STORAGE_KEYS.HISTORY);
+
+    if (window.Dice3D && typeof window.Dice3D.clearHistory === "function") {
+      window.Dice3D.clearHistory();
+    }
+
+    closeClearHistoryModal();
+    mostrarToast("Histórico apagado com sucesso.");
   }
 
   function clearDiceHistory() {
-    handleClearHistory();
+    openClearHistoryModal();
   }
 
   /**
    * Retorna a função pública para rolar dados
    */
   function rollDice(diceType, quantity = 1) {
+    const diceLabel = String(diceType).startsWith("d") ? String(diceType) : `d${diceType}`;
+
     // Usa Dice3D se disponível
     if (window.Dice3D && window.Dice3D.isInitialized()) {
-      window.Dice3D.rollDice(diceType, quantity);
+      window.Dice3D.rollDice(diceLabel, quantity);
     } else {
       // Fallback: simula rolagem sem 3D
       const results = [];
-      const diceValue = parseInt(diceType.substring(1));
+      const diceValue = Number(diceLabel.replace("d", ""));
 
       for (let i = 0; i < quantity; i++) {
         results.push(Math.floor(Math.random() * diceValue) + 1);
       }
 
       const total = results.reduce((a, b) => a + b, 0);
-      registerRollResult(diceType, quantity, results, total);
+      registerRollResult(diceLabel, quantity, results, total);
     }
   }
 
@@ -442,12 +502,12 @@ const SessionPanel = (() => {
    * Exibe o resultado da rolagem
    */
   function displayResult(diceType, quantity, results, total, entry) {
-    const resultDisplay = elements.diceResult.querySelector(".result-display");
+    if (!elements.diceResult) return;
 
     if (quantity === 1) {
-      resultDisplay.innerHTML = `Resultado: <strong>${total}</strong>`;
+      elements.diceResult.innerHTML = `Resultado: <strong>${total}</strong>`;
     } else {
-      resultDisplay.innerHTML = `${quantity}${diceType}: ${results.join(", ")} = <strong>${total}</strong>`;
+      elements.diceResult.innerHTML = `${quantity}${diceType}: ${results.join(", ")} = <strong>${total}</strong>`;
     }
 
     // Adiciona animação
@@ -475,6 +535,8 @@ const SessionPanel = (() => {
     getNotes: () => elements.notesInput.value
   };
 })();
+
+window.SessionPanel = SessionPanel;
 
 // Toast helper (se não existir)
 function toast(message, type = "info") {
