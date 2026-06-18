@@ -1354,7 +1354,16 @@ function authErrorMessage(error) {
 
 function applySavedTheme() {
   const savedTheme = localStorage.getItem(themeKey);
-  setTheme(savedTheme === "light" ? "light-purple" : savedTheme || "purple", false);
+  const legacyLightThemes = {
+    light: "purple",
+    "light-purple": "purple",
+    "light-red": "red",
+    "light-orange": "orange",
+    "light-green": "green",
+    "light-blue": "blue"
+  };
+  const normalizedTheme = legacyLightThemes[savedTheme] || savedTheme || "purple";
+  setTheme(normalizedTheme, false);
 }
 
 function setTheme(theme, persist = true) {

@@ -177,71 +177,6 @@ body[data-theme="blue"] {
   --bg-mid: #0d182b;
 }
 
-body[data-theme^="light-"],
-body[data-theme="light"] {
-  --bg: #f5f7fb;
-  --panel: #ffffff;
-  --panel-2: #edf2f7;
-  --text: #151827;
-  --muted: #5b6478;
-  --bg-start: #f8fbff;
-  --bg-mid: #eef5ff;
-  --field-bg: rgba(255, 255, 255, 0.86);
-  --sidebar-bg: rgba(255, 255, 255, 0.9);
-  --panel-bg: rgba(255, 255, 255, 0.84);
-  --card-bg: rgba(255, 255, 255, 0.68);
-  --red: #d7263d;
-  --line: rgba(21, 24, 39, 0.14);
-  --shadow: 0 24px 70px rgba(48, 60, 90, 0.18);
-  --fusion-glass: rgba(255, 255, 255, 0.72);
-  color-scheme: light;
-}
-
-body[data-theme="light"],
-body[data-theme="light-purple"] {
-  --purple: #6b3fa8;
-  --purple-dark: #4c2b7e;
-  --cyan: #008f7a;
-  --theme-rgb: 107, 63, 168;
-  --accent-rgb: 107, 63, 168;
-  --theme-bg-end: #e8fff9;
-}
-
-body[data-theme="light-red"] {
-  --purple: #d7263d;
-  --purple-dark: #9f1d31;
-  --cyan: #b83245;
-  --theme-rgb: 215, 38, 61;
-  --accent-rgb: 215, 38, 61;
-  --theme-bg-end: #fff1f3;
-}
-
-body[data-theme="light-orange"] {
-  --purple: #c66a00;
-  --purple-dark: #8f4d00;
-  --cyan: #a85f00;
-  --theme-rgb: 198, 106, 0;
-  --accent-rgb: 198, 106, 0;
-  --theme-bg-end: #fff6e6;
-}
-
-body[data-theme="light-green"] {
-  --purple: #008f72;
-  --purple-dark: #006451;
-  --cyan: #007a63;
-  --theme-rgb: 0, 143, 114;
-  --accent-rgb: 0, 143, 114;
-  --theme-bg-end: #eafff7;
-}
-
-body[data-theme="light-blue"] {
-  --purple: #2563eb;
-  --purple-dark: #1d4ed8;
-  --cyan: #0f78b8;
-  --theme-rgb: 37, 99, 235;
-  --accent-rgb: 37, 99, 235;
-  --theme-bg-end: #eaf3ff;
-}
 
 button,
 input,
@@ -481,12 +416,6 @@ label,
 .theme-dot.orange { background: #ff9f1c; }
 .theme-dot.green { background: #00c9a7; }
 .theme-dot.blue { background: #3a86ff; }
-.theme-dot.light { background: #f8fbff; }
-.theme-dot.light-purple { background: linear-gradient(135deg, #f8fbff 0 45%, #6b3fa8 45% 100%); }
-.theme-dot.light-red { background: linear-gradient(135deg, #f8fbff 0 45%, #d7263d 45% 100%); }
-.theme-dot.light-orange { background: linear-gradient(135deg, #f8fbff 0 45%, #c66a00 45% 100%); }
-.theme-dot.light-green { background: linear-gradient(135deg, #f8fbff 0 45%, #008f72 45% 100%); }
-.theme-dot.light-blue { background: linear-gradient(135deg, #f8fbff 0 45%, #2563eb 45% 100%); }
 
 .icon-button {
   width: 42px;
