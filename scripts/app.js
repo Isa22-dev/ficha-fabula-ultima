@@ -16,9 +16,9 @@ const bondTypes = {
   Aliado: "#9b5de5",
   Neutro: "#8d95b7"
 };
-const defaultSheet = () => ({
+const defaultSheet = ({ withLocalId = true } = {}) => ({
   id: null,
-  localId: createLocalId(),
+  localId: withLocalId ? createLocalId() : null,
   nome: "",
   classe: "",
   nivel: 1,
@@ -55,7 +55,7 @@ const defaultSheet = () => ({
   rolagens: []
 });
 
-let state = defaultSheet();
+let state = null;
 let user = null;
 let autosaveTimer = null;
 let isDirty = false;
@@ -63,6 +63,8 @@ let remoteSaveEnabled = true;
 let schemaWarningShown = false;
 let isSaving = false;
 let pendingSave = false;
+let sheetList = [];
+let deleteModalOpen = false;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -81,10 +83,7 @@ async function init() {
     user = session?.user || null;
     refreshAuthState();
   });
-  restoreLocalBackup();
   await refreshAuthState();
-  hydrateForm();
-  renderAll();
   setLoading(false);
 }
 
@@ -136,6 +135,7 @@ function renderStaticControls() {
 
 function bindEvents() {
   $("#sheetForm").addEventListener("input", (event) => {
+    if (!state) return;
     const target = event.target;
     if (target.dataset.field) setField(target.dataset.field, target.value);
     if (target.dataset.field === "retrato") renderProfilePhoto();
@@ -163,9 +163,15 @@ function bindEvents() {
   $("#saveBtn")?.addEventListener("click", () => salvarFicha());
   $("#saveBtnTop").addEventListener("click", () => salvarFicha());
   $("#newSheetBtn").addEventListener("click", novaFicha);
+  $("#emptyNewSheetBtn").addEventListener("click", novaFicha);
   $("#newSheetBtnSettings").addEventListener("click", novaFicha);
   $("#loadSelectedBtn").addEventListener("click", () => carregarFichaSupabase($("#sheetSelect").value));
-  $("#deleteBtn").addEventListener("click", excluirFicha);
+  $("#deleteBtn").addEventListener("click", abrirModalExclusao);
+  $("#cancelDeleteBtn").addEventListener("click", () => fecharModalExclusao(true));
+  $("#confirmDeleteBtn").addEventListener("click", confirmarExclusao);
+  $("#deleteModal").addEventListener("click", (event) => {
+    if (event.target.id === "deleteModal") fecharModalExclusao(true);
+  });
   $("#resetBtn").addEventListener("click", resetarFicha);
   $("#exportBtn")?.addEventListener("click", exportarJSON);
   $("#importInput")?.addEventListener("change", importarJSON);
@@ -183,9 +189,9 @@ function bindEvents() {
     const roll = event.target.closest("[data-die]");
     const attrRoll = event.target.closest("[data-roll-attribute]");
     const themeOption = event.target.closest("[data-theme-option]");
-    if (remove) removeItem(remove.dataset.remove, Number(remove.dataset.index));
-    if (roll) rollDie(Number(roll.dataset.die));
-    if (attrRoll) rolarAtributo(attrRoll.dataset.rollAttribute);
+    if (remove && state) removeItem(remove.dataset.remove, Number(remove.dataset.index));
+    if (roll && state) rollDie(Number(roll.dataset.die));
+    if (attrRoll && state) rolarAtributo(attrRoll.dataset.rollAttribute);
     if (themeOption) {
       setTheme(themeOption.dataset.themeOption);
       closeThemeMenu();
@@ -195,6 +201,10 @@ function bindEvents() {
   });
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && deleteModalOpen) {
+      fecharModalExclusao(true);
+      return;
+    }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
       event.preventDefault();
       salvarFicha();
@@ -203,6 +213,7 @@ function bindEvents() {
 }
 
 function setField(field, value) {
+  if (!state) return;
   if (["defesa", "defesaMagica", "iniciativa", "condicoes"].includes(field)) {
     state.combate[field] = field === "condicoes" ? value : Number(value || 0);
     return;
@@ -210,7 +221,32 @@ function setField(field, value) {
   state[field] = field === "nivel" ? Number(value || 1) : value;
 }
 
+function updateWorkspaceState() {
+  const hasUser = Boolean(user);
+  const hasSheet = Boolean(state);
+  const hasSavedSheets = sheetList.length > 0;
+  $("#sheetForm").classList.toggle("hidden", !hasUser || !hasSheet);
+  $("#emptyState").classList.toggle("hidden", !hasUser || hasSheet);
+  $("#emptyStateTitle").textContent = hasSavedSheets ? "Selecione uma ficha salva." : "Nenhuma ficha encontrada.";
+  $("#emptyStateMessage").textContent = hasSavedSheets ? "Use a lista de fichas salvas ou clique em Nova Ficha para começar outra." : "Clique em Nova Ficha para começar.";
+  $("#saveBtnTop").disabled = !hasUser || !hasSheet;
+  $("#loadSelectedBtn").disabled = !hasUser || !$("#sheetSelect").value;
+  $("#deleteBtn").disabled = !hasUser || !state?.id;
+  $("#exportBtn").disabled = !hasSheet;
+  $("#resetBtn").disabled = !hasSheet;
+}
+
+function clearActiveSheet() {
+  state = null;
+  isDirty = false;
+  pendingSave = false;
+  clearTimeout(autosaveTimer);
+  $("#sheetSelect").value = "";
+  updateWorkspaceState();
+}
+
 function hydrateForm() {
+  if (!state) return;
   $$("[data-field]").forEach((input) => {
     const field = input.dataset.field;
     input.value = state.combate[field] ?? state[field] ?? "";
@@ -226,6 +262,10 @@ function hydrateForm() {
 }
 
 function renderAll() {
+  if (!state) {
+    updateWorkspaceState();
+    return;
+  }
   renderResources();
   renderMemories();
   renderEquipment();
@@ -233,9 +273,11 @@ function renderAll() {
   renderRollHistory();
   renderProfilePhoto();
   renderPreview();
+  updateWorkspaceState();
 }
 
 function renderAttributeRollPlaceholder(attr) {
+  if (!state) return;
   const target = $(`#attrRoll${attr}`);
   if (!target) return;
   const sides = Number(state.atributos[attr].replace("d", ""));
@@ -244,11 +286,12 @@ function renderAttributeRollPlaceholder(attr) {
 
 function renderProfilePhoto() {
   const preview = $("#profilePhotoPreview");
-  if (!preview) return;
+  if (!preview || !state) return;
   preview.src = state.retrato || "assets/images/portrait-placeholder.svg";
 }
 
 function renderResources() {
+  if (!state) return;
   resources.forEach(({ key }) => {
     const resource = state.recursos[key];
     const percent = Math.max(0, Math.min(100, Math.round((resource.atual / Math.max(resource.maximo, 1)) * 100)));
@@ -258,6 +301,7 @@ function renderResources() {
 }
 
 function renderMemories() {
+  if (!state) return;
   $("#memoryList").innerHTML = state.memorias.map((item, index) => `
     <article class="edit-card">
       <button type="button" class="icon-button remove-card" data-remove="memorias" data-index="${index}" title="Excluir"><i class="ti ti-x"></i></button>
@@ -271,6 +315,7 @@ function renderMemories() {
 }
 
 function renderEquipment() {
+  if (!state) return;
   $("#equipmentList").innerHTML = state.equipamentos.map((item, index) => `
     <article class="edit-card">
       <button type="button" class="icon-button remove-card" data-remove="equipamentos" data-index="${index}" title="Remover"><i class="ti ti-x"></i></button>
@@ -282,6 +327,7 @@ function renderEquipment() {
 }
 
 function renderBonds() {
+  if (!state) return;
   $("#bondList").innerHTML = state.lacos.map((item, index) => `
     <article class="edit-card bond-card" style="--bond:${bondTypes[item.tipo] || bondTypes.Neutro}">
       <button type="button" class="icon-button remove-card" data-remove="lacos" data-index="${index}" title="Remover"><i class="ti ti-x"></i></button>
@@ -295,24 +341,28 @@ function renderBonds() {
 }
 
 function addMemory() {
+  if (!state) return;
   state.memorias.push({ codigo: "M-00", titulo: "", habilidade: "", descricao: "", custo: "" });
   renderMemories();
   markDirty();
 }
 
 function addEquipment() {
+  if (!state) return;
   state.equipamentos.push({ nome: "", descricao: "", bonus: "" });
   renderEquipment();
   markDirty();
 }
 
 function addBond() {
+  if (!state) return;
   state.lacos.push({ nome: "", tipo: "Conexao", notas: "" });
   renderBonds();
   markDirty();
 }
 
 function removeItem(list, index) {
+  if (!state) return;
   if (!confirm("Excluir este item?")) return;
   state[list].splice(index, 1);
   renderAll();
@@ -388,23 +438,36 @@ async function logoutUsuario() {
 async function logout() {
   await db.auth.signOut();
   user = null;
-  state = defaultSheet();
+  state = null;
+  sheetList = [];
   await refreshAuthState();
-  hydrateForm();
-  renderAll();
   toast("Sessao encerrada.");
 }
 
 async function refreshAuthState() {
   $("#authPanel").classList.toggle("hidden", Boolean(user));
-  $("#sheetForm").classList.toggle("blurred", !user);
+  if (!user) {
+    clearActiveSheet();
+    $("#sheetSelect").innerHTML = `<option value="">Fichas salvas</option>`;
+    updateWorkspaceState();
+    return;
+  }
   await listarFichas();
+  updateWorkspaceState();
 }
 
 async function salvarFicha(options = {}) {
   const silent = options.silent === true;
+  if (!state) {
+    if (!silent) toast("Clique em Nova Ficha para começar.", "danger");
+    return;
+  }
   if (!user) {
     if (!silent) toast("Entre para salvar online.", "danger");
+    return;
+  }
+  if (!fichaTemConteudo(state)) {
+    if (!silent) toast("Preencha a ficha antes de salvar.", "danger");
     return;
   }
   if (isSaving) {
@@ -417,7 +480,7 @@ async function salvarFicha(options = {}) {
 
   try {
     const payload = toPayload();
-    if (!state.id) state.id = await encontrarFichaExistente();
+    const isUpdate = Boolean(state.id);
     const request = state.id
       ? db.from("fichas_rpg").update(payload).eq("id", state.id).select("id").single()
       : db.from("fichas_rpg").insert(payload).select("id").single();
@@ -428,19 +491,15 @@ async function salvarFicha(options = {}) {
     if (!silent) {
       await listarFichas();
       $("#sheetSelect").value = state.id;
-      toast("Ficha salva.");
+      updateWorkspaceState();
+      toast(isUpdate ? "Ficha atualizada com sucesso." : "Ficha salva com sucesso.");
     }
   } catch (error) {
     if (!silent) toast("Nao foi possivel salvar agora.", "danger");
   } finally {
     if (!silent) setLoading(false);
     isSaving = false;
-    if (pendingSave && isDirty && remoteSaveEnabled) {
-      pendingSave = false;
-      salvarFicha({ silent: true });
-    } else {
-      pendingSave = false;
-    }
+    pendingSave = false;
   }
 }
 
@@ -449,6 +508,7 @@ async function salvarFichaSupabase() {
 }
 
 async function encontrarFichaExistente() {
+  if (!state) return null;
   if (!state.localId) state.localId = createLocalId();
   const { data, error } = await db
     .from("fichas_rpg")
@@ -466,6 +526,7 @@ async function carregarFicha(id) {
   setLoading(false);
   if (error) return handleSupabaseError(error);
   state = fromRow(data);
+  isDirty = false;
   hydrateForm();
   renderAll();
   toast("Ficha carregada.");
@@ -479,45 +540,138 @@ async function atualizarFicha() {
   return salvarFicha();
 }
 
-async function atualizarFichaSupabase(id = state.id) {
+async function atualizarFichaSupabase(id = state?.id) {
+  if (!state) return;
   if (id && id !== state.id) state.id = id;
   return atualizarFicha();
 }
 
+function abrirModalExclusao() {
+  if (!state?.id) return toast("Nenhuma ficha salva para excluir.", "danger");
+  deleteModalOpen = true;
+  const modal = $("#deleteModal");
+  modal.classList.remove("hidden", "closing");
+  $("#cancelDeleteBtn").focus();
+}
+
+function fecharModalExclusao(showToast = false) {
+  if (!deleteModalOpen) return;
+  deleteModalOpen = false;
+  const modal = $("#deleteModal");
+  modal.classList.add("closing");
+  setTimeout(() => {
+    modal.classList.add("hidden");
+    modal.classList.remove("closing");
+  }, 180);
+  if (showToast) toast("Exclusão cancelada.");
+}
+
+async function confirmarExclusao() {
+  fecharModalExclusao(false);
+  await excluirFicha();
+}
+
 async function excluirFicha() {
-  if (!state.id) return toast("Nenhuma ficha salva para excluir.", "danger");
-  if (!confirm("Excluir esta ficha permanentemente?")) return;
+  if (!state?.id) return toast("Nenhuma ficha salva para excluir.", "danger");
   setLoading(true);
   const { error } = await db.from("fichas_rpg").delete().eq("id", state.id);
   setLoading(false);
   if (error) return handleSupabaseError(error);
-  state = defaultSheet();
-  hydrateForm();
-  renderAll();
+  state = null;
+  isDirty = false;
   await listarFichas();
-  toast("Ficha excluida.");
+  updateWorkspaceState();
+  toast("Ficha excluída com sucesso.");
 }
 
-async function excluirFichaSupabase(id = state.id) {
+async function excluirFichaSupabase(id = state?.id) {
+  if (!state) return;
   if (id && id !== state.id) state.id = id;
-  return excluirFicha();
+  return abrirModalExclusao();
 }
 
 async function listarFichas() {
   const select = $("#sheetSelect");
   select.innerHTML = `<option value="">Fichas salvas</option>`;
-  if (!user) return;
-  const { data, error } = await db.from("fichas_rpg").select("id,nome,classe,nivel").order("updated_at", { ascending: false });
+  sheetList = [];
+  if (!user) return [];
+  const { data, error } = await db
+    .from("fichas_rpg")
+    .select("id,nome,classe,nivel,tema,origem,retrato,personagem,updated_at")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false });
   if (error) return handleSupabaseError(error, false);
-  select.innerHTML += data.map((sheet) => `<option value="${sheet.id}">${escapeHtml(sheet.nome || "Sem nome")} - Nv ${sheet.nivel || 1}</option>`).join("");
+  sheetList = filtrarFichasPersistidas(data || []);
+  if (!sheetList.length) {
+    select.innerHTML = `<option value="">Nenhuma ficha encontrada</option>`;
+    if (!state?.id) clearActiveSheet();
+    return sheetList;
+  }
+  select.innerHTML += sheetList.map((sheet) => `<option value="${sheet.id}">${escapeHtml(sheet.nome || "Sem nome")} - Nv ${sheet.nivel || 1}</option>`).join("");
+  if (state?.id && sheetList.some((sheet) => sheet.id === state.id)) {
+    select.value = state.id;
+  } else if (!state?.id) {
+    select.value = "";
+  }
+  updateWorkspaceState();
+  return sheetList;
 }
 
 async function listarFichasSupabase() {
   return listarFichas();
 }
 
+function filtrarFichasPersistidas(fichas) {
+  const vistos = new Set();
+  return fichas.filter((ficha) => {
+    const personagem = ficha?.personagem || {};
+    const chave = personagem.localId || ficha?.id;
+    if (!ficha?.id || !chave || vistos.has(chave)) return false;
+    vistos.add(chave);
+    return fichaTemConteudo(ficha);
+  });
+}
+
+function fichaTemConteudo(ficha) {
+  const personagem = ficha.personagem || ficha || {};
+  const identidade = personagem.identidade || {};
+  const camposVisiveis = [
+    ficha.nome,
+    ficha.classe,
+    ficha.tema,
+    ficha.origem,
+    ficha.retrato,
+    ficha.idade,
+    ficha.altura,
+    ficha.peso,
+    ficha.aparencia,
+    ficha.pecado,
+    ficha.historico,
+    ficha.alerta,
+    identidade.nome,
+    identidade.classe,
+    identidade.tema,
+    identidade.origem,
+    identidade.idade,
+    identidade.altura,
+    identidade.peso,
+    identidade.aparencia,
+    identidade.pecado,
+    identidade.historico,
+    identidade.alerta,
+    personagem.aparencia,
+    personagem.pecado,
+    personagem.historico,
+    personagem.alerta,
+    personagem.condicoes
+  ];
+  const listas = [personagem.memorias, personagem.equipamentos, personagem.lacos, personagem.rolagens, ficha.memorias, ficha.equipamentos, ficha.lacos, ficha.rolagens];
+  return camposVisiveis.some((valor) => String(valor || "").trim()) || listas.some((lista) => Array.isArray(lista) && lista.length > 0);
+}
+
 function novaFicha() {
   state = defaultSheet();
+  isDirty = false;
   hydrateForm();
   renderAll();
   $("#sheetSelect").value = "";
@@ -525,6 +679,7 @@ function novaFicha() {
 }
 
 function resetarFicha() {
+  if (!state) return toast("Clique em Nova Ficha para começar.", "danger");
   if (!confirm("Resetar os campos da ficha atual?")) return;
   const id = state.id;
   const localId = state.localId;
@@ -537,6 +692,7 @@ function resetarFicha() {
 }
 
 function toPayload() {
+  if (!state) return null;
   return {
     nome: state.nome,
     classe: state.classe,
@@ -585,13 +741,13 @@ function toPayload() {
 }
 
 function fromRow(row) {
-  const sheet = defaultSheet();
+  const sheet = defaultSheet({ withLocalId: false });
   const personagem = row.personagem || {};
   return {
     ...sheet,
     ...personagem,
     id: row.id,
-    localId: personagem.localId || sheet.localId,
+    localId: personagem.localId || null,
     nome: row.nome || "",
     classe: row.classe || "",
     nivel: row.nivel || 1,
@@ -609,6 +765,7 @@ function fromRow(row) {
 }
 
 function rollDie(sides, label = "") {
+  if (!state) return Promise.resolve(null);
   return new Promise((resolve) => {
     const die = $("#dieVisual");
     const number = $("#dieNumber");
@@ -649,6 +806,7 @@ function rollDie(sides, label = "") {
 }
 
 async function rolarAtributo(attr) {
+  if (!state) return;
   const sides = Number(state.atributos[attr].replace("d", ""));
   const target = $(`#attrRoll${attr}`);
   target.innerHTML = `<div class="mini-die d${sides} rolling"><span>?</span></div><small>Rolando D${sides}</small>`;
@@ -660,6 +818,7 @@ async function rolarAtributo(attr) {
 }
 
 function renderRollHistory() {
+  if (!state) return;
   $("#rollHistory").innerHTML = state.rolagens.map((roll) => `
     <div class="roll-item ${roll.status}">
       <strong>${roll.label || roll.dado} = ${roll.resultado}</strong>
@@ -669,6 +828,7 @@ function renderRollHistory() {
 }
 
 function limparHistoricoDados() {
+  if (!state) return;
   if (!state.rolagens.length) {
     toast("Historico de dados ja esta vazio.");
     return;
@@ -681,6 +841,10 @@ function limparHistoricoDados() {
 }
 
 function renderPreview() {
+  if (!state) {
+    $("#previewSheet").innerHTML = "";
+    return;
+  }
   const portrait = state.retrato || "assets/images/portrait-placeholder.svg";
   $("#previewSheet").innerHTML = `
     <div class="preview-hero">
@@ -760,6 +924,7 @@ function renderPreview() {
 }
 
 function exportarJSON() {
+  if (!state) return toast("Nenhuma ficha selecionada para exportar.", "danger");
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -774,17 +939,18 @@ function importarJSON(event) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
-    state = { ...defaultSheet(), ...JSON.parse(reader.result) };
+    state = { ...defaultSheet(), ...JSON.parse(reader.result), id: null };
     if (!state.localId) state.localId = createLocalId();
+    isDirty = true;
     hydrateForm();
     renderAll();
-    markDirty();
     toast("JSON importado.");
   };
   reader.readAsText(file);
 }
 
 function importarFotoPerfil(event) {
+  if (!state) return toast("Clique em Nova Ficha para começar.", "danger");
   const file = event.target.files[0];
   if (!file) return;
   if (!file.type.startsWith("image/")) {
@@ -832,6 +998,7 @@ function comprimirFotoPerfil(file) {
 }
 
 function removerFotoPerfil() {
+  if (!state) return;
   state.retrato = "";
   const input = document.querySelector('[data-field="retrato"]');
   if (input) input.value = "";
@@ -842,28 +1009,16 @@ function removerFotoPerfil() {
 }
 
 function markDirty() {
+  if (!state) return;
   isDirty = true;
   saveLocalBackup();
   renderPreview();
   clearTimeout(autosaveTimer);
-  autosaveTimer = setTimeout(() => {
-    if (isDirty && user && remoteSaveEnabled) salvarFicha({ silent: true });
-  }, 900);
 }
 
 function saveLocalBackup() {
+  if (!state) return;
   localStorage.setItem(backupKey, JSON.stringify(state));
-}
-
-function restoreLocalBackup() {
-  const backup = localStorage.getItem(backupKey);
-  if (!backup || user) return;
-  try {
-    state = { ...defaultSheet(), ...JSON.parse(backup) };
-    if (!state.localId) state.localId = createLocalId();
-  } catch {
-    localStorage.removeItem(backupKey);
-  }
 }
 
 function createLocalId() {
@@ -1005,7 +1160,7 @@ function escapeHtml(value = "") {
 window.salvarFicha = salvarFicha;
 window.carregarFicha = carregarFicha;
 window.atualizarFicha = atualizarFicha;
-window.excluirFicha = excluirFicha;
+window.excluirFicha = abrirModalExclusao;
 window.listarFichas = listarFichas;
 window.cadastrarUsuario = cadastrarUsuario;
 window.loginUsuario = loginUsuario;

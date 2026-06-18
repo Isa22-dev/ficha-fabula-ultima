@@ -92,7 +92,14 @@
           <span>Sincronizando dados...</span>
         </div>
 
-        <form class="sheet-form" id="sheetForm">
+        <section class="empty-state hidden" id="emptyState">
+          <p class="eyebrow">Gerenciamento de fichas</p>
+          <h2 id="emptyStateTitle">Nenhuma ficha encontrada.</h2>
+          <p id="emptyStateMessage">Clique em Nova Ficha para começar.</p>
+          <button class="primary-button" type="button" id="emptyNewSheetBtn"><i class="ti ti-file-plus"></i>Nova Ficha</button>
+        </section>
+
+        <form class="sheet-form hidden" id="sheetForm">
           <section class="tab-panel active" id="identidade">
             <div class="section-head">
               <div>
@@ -207,6 +214,16 @@
     </div>
 
     <div class="toast-stack" id="toastStack"></div>
+    <div class="modal-backdrop hidden" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
+      <div class="confirm-modal">
+        <h2 id="deleteModalTitle">Excluir Ficha</h2>
+        <p>Tem certeza que deseja excluir esta ficha? Esta ação não poderá ser desfeita.</p>
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" id="cancelDeleteBtn">CANCELAR</button>
+          <button class="danger-button" type="button" id="confirmDeleteBtn">EXCLUIR</button>
+        </div>
+      </div>
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./scripts/supabase.js"></script>
     <script src="./scripts/app.js"></script>
