@@ -65,6 +65,7 @@ let isSaving = false;
 let pendingSave = false;
 let sheetList = [];
 let deleteModalOpen = false;
+let pendingDeleteId = null;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -546,8 +547,10 @@ async function atualizarFichaSupabase(id = state?.id) {
   return atualizarFicha();
 }
 
-function abrirModalExclusao() {
-  if (!state?.id) return toast("Nenhuma ficha salva para excluir.", "danger");
+function abrirModalExclusao(id = state?.id) {
+  const fichaId = String(id || "");
+  if (!isUuid(fichaId)) return toast("Nenhuma ficha salva para excluir.", "danger");
+  pendingDeleteId = fichaId;
   deleteModalOpen = true;
   const modal = $("#deleteModal");
   modal.classList.remove("hidden", "closing");
@@ -557,6 +560,7 @@ function abrirModalExclusao() {
 function fecharModalExclusao(showToast = false) {
   if (!deleteModalOpen) return;
   deleteModalOpen = false;
+  pendingDeleteId = null;
   const modal = $("#deleteModal");
   modal.classList.add("closing");
   setTimeout(() => {
@@ -567,27 +571,38 @@ function fecharModalExclusao(showToast = false) {
 }
 
 async function confirmarExclusao() {
+  const fichaId = pendingDeleteId;
   fecharModalExclusao(false);
-  await excluirFicha();
+  await excluirFicha(fichaId);
 }
 
-async function excluirFicha() {
-  if (!state?.id) return toast("Nenhuma ficha salva para excluir.", "danger");
+async function excluirFicha(id) {
+  const fichaId = String(id || "");
+  if (!user) return toast("Entre para excluir fichas.", "danger");
+  if (!isUuid(fichaId)) return toast("Nenhuma ficha salva para excluir.", "danger");
   setLoading(true);
-  const { error } = await db.from("fichas_rpg").delete().eq("id", state.id);
+  const { data, error } = await db
+    .from("fichas_rpg")
+    .delete()
+    .eq("id", fichaId)
+    .eq("user_id", user.id)
+    .select("id")
+    .maybeSingle();
   setLoading(false);
   if (error) return handleSupabaseError(error);
-  state = null;
-  isDirty = false;
+  if (!data?.id) return toast("Ficha não encontrada para exclusão.", "danger");
+  sheetList = sheetList.filter((ficha) => ficha.id !== fichaId);
+  if (state?.id === fichaId) {
+    state = null;
+    isDirty = false;
+  }
   await listarFichas();
   updateWorkspaceState();
   toast("Ficha excluída com sucesso.");
 }
 
 async function excluirFichaSupabase(id = state?.id) {
-  if (!state) return;
-  if (id && id !== state.id) state.id = id;
-  return abrirModalExclusao();
+  return abrirModalExclusao(id);
 }
 
 async function listarFichas() {
@@ -1063,6 +1078,10 @@ function getAuthLoginId() {
 
 function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function usernameToAuthEmail(username) {
