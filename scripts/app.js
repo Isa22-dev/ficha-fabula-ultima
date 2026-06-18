@@ -92,14 +92,6 @@ async function init() {
 }
 
 function bindNavigation() {
-  $$(".nav-tab[data-tab]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const tab = button.dataset.tab;
-      ativarAba(tab);
-      closeDrawer();
-      if (tab === "visualizacao") renderPreview();
-    });
-  });
   initDrawerMenu();
 }
 
@@ -112,48 +104,46 @@ function getDrawerElements() {
   };
 }
 
-function openDrawer() {
-  const { icon, menu, overlay } = getDrawerElements();
+function setDrawerOpen(isOpen) {
+  const { toggle, icon, menu, overlay } = getDrawerElements();
 
   if (!menu || !overlay) return;
 
-  drawerOpen = true;
+  drawerOpen = Boolean(isOpen);
 
-  menu.classList.add("open");
-  overlay.classList.add("active");
+  menu.classList.toggle("open", drawerOpen);
+  overlay.classList.toggle("active", drawerOpen);
+  document.body.classList.toggle("drawer-open", drawerOpen);
+  menu.setAttribute("aria-hidden", String(!drawerOpen));
+
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", String(drawerOpen));
+    toggle.setAttribute("aria-label", drawerOpen ? "Fechar menu" : "Abrir menu");
+  }
 
   if (icon) {
-    icon.classList.remove("ti-menu-2");
-    icon.classList.add("ti-x");
+    icon.classList.toggle("ti-menu-2", !drawerOpen);
+    icon.classList.toggle("ti-x", drawerOpen);
   }
+}
+
+function openDrawer() {
+  setDrawerOpen(true);
 }
 
 function closeDrawer() {
-  const { icon, menu, overlay } = getDrawerElements();
-
-  if (!menu || !overlay) return;
-
-  drawerOpen = false;
-
-  menu.classList.remove("open");
-  overlay.classList.remove("active");
-
-  if (icon) {
-    icon.classList.remove("ti-x");
-    icon.classList.add("ti-menu-2");
-  }
+  setDrawerOpen(false);
 }
 
 function toggleDrawer() {
-  if (drawerOpen) {
-    closeDrawer();
-  } else {
-    openDrawer();
-  }
+  setDrawerOpen(!drawerOpen);
 }
 
 function switchPanel(panel) {
-  const targetPanel = panel === "habilidades" ? "memorias" : panel;
+  const panelAliases = {
+    habilidades: "memorias"
+  };
+  const targetPanel = panelAliases[panel] || panel;
 
   if (targetPanel === "biblioteca") {
     voltarParaBiblioteca();
@@ -185,31 +175,35 @@ function initDrawerMenu() {
     return;
   }
 
-  toggle.addEventListener("click", function (event) {
+  if (menu.dataset.drawerReady === "true") return;
+  menu.dataset.drawerReady = "true";
+  setDrawerOpen(false);
+
+  toggle.addEventListener("click", (event) => {
     event.stopPropagation();
     toggleDrawer();
   });
 
-  overlay.addEventListener("click", function () {
+  overlay.addEventListener("click", () => {
     closeDrawer();
   });
 
-  document.addEventListener("keydown", function (event) {
-    if (event.key === "Escape") {
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && drawerOpen) {
       closeDrawer();
     }
   });
 
-  menu.querySelectorAll(".drawer-item").forEach(function (item) {
-    item.addEventListener("click", function () {
-      const panel = item.dataset.panel;
+  menu.addEventListener("click", (event) => {
+    const item = event.target.closest(".drawer-item");
+    if (!item || !menu.contains(item)) return;
 
-      if (panel && typeof switchPanel === "function") {
-        switchPanel(panel);
-      }
+    const panel = item.dataset.panel;
+    closeDrawer();
 
-      closeDrawer();
-    });
+    if (panel) {
+      switchPanel(panel);
+    }
   });
 }
 
@@ -219,7 +213,7 @@ function abrirConfiguracoes() {
     return;
   }
   ativarAba("configuracoes");
-  $(".sidebar").classList.remove("open");
+  closeDrawer();
 }
 
 function ativarAba(tab) {
@@ -947,7 +941,9 @@ function resumoFicha(ficha) {
   const identidade = personagem.identidade || {};
   const combate = personagem.combate || {};
   const recursosFicha = personagem.recursos || {};
-  const memorias = Array.isArray(personagem.memorias) ? personagem.memorias.slice(0, 3) : [];
+  const lacos = Array.isArray(personagem.lacos) && personagem.lacos.length
+    ? personagem.lacos.slice(0, 3)
+    : Array.isArray(personagem.memorias) ? personagem.memorias.slice(0, 3) : [];
   return {
     nome: ficha.nome || identidade.nome || "Ficha sem titulo",
     classe: ficha.classe || identidade.classe || "Classe indefinida",
@@ -958,7 +954,7 @@ function resumoFicha(ficha) {
     pv: recursosFicha.pv || { atual: 0, maximo: 0 },
     pm: recursosFicha.pm || { atual: 0, maximo: 0 },
     pf: recursosFicha.pf || { atual: 0, maximo: 0 },
-    memorias: memorias.map((memoria) => memoria.titulo || memoria.codigo || memoria.habilidade || "Laço sem título")
+    memorias: lacos.map((item) => item.nome || item.titulo || item.codigo || item.habilidade || "Laço sem título")
   };
 }
 

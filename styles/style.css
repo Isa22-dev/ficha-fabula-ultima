@@ -43,6 +43,10 @@ body {
   overflow-x: hidden;
 }
 
+body.drawer-open {
+  overflow: hidden;
+}
+
 .fusion-backdrop {
   position: fixed;
   inset: 0;
@@ -204,7 +208,7 @@ button {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 284px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -455,6 +459,8 @@ label,
   z-index: 999;
   padding: 20px;
   animation: none;
+  overflow-y: auto;
+  box-shadow: 22px 0 55px rgba(0, 0, 0, 0.32);
 }
 
 .drawer-menu.open {
@@ -470,11 +476,17 @@ label,
   border-radius: 10px;
   padding: 8px 10px;
   cursor: pointer;
+  display: inline-grid;
+  min-width: 42px;
+  min-height: 42px;
+  place-items: center;
 }
 
 .drawer-item {
   width: 100%;
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 9px;
   background: transparent;
   border: 0;
   color: #e9dcc2;
