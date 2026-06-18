@@ -630,7 +630,13 @@ function rollDie(sides, label = "") {
         die.classList.remove("rolling");
         die.classList.toggle("critical", status === "critico");
         die.classList.toggle("failure", status === "falha");
+        die.classList.remove("dice-impact");
+        void die.offsetWidth;
+        die.classList.add("dice-impact");
         result.textContent = `${label ? `${label}: ` : ""}${final}`;
+        result.classList.remove("dice-impact");
+        void result.offsetWidth;
+        result.classList.add("dice-impact");
         detail.textContent = status === "critico" ? "Critico luminoso." : status === "falha" ? "Falha detectada." : `Resultado D${sides}.`;
         state.rolagens.unshift({ dado: `D${sides}`, label, resultado: final, status, horario: new Date().toLocaleTimeString("pt-BR") });
         state.rolagens = state.rolagens.slice(0, 20);
@@ -874,7 +880,10 @@ function toast(message, type = "success") {
   item.className = `toast ${type}`;
   item.textContent = message;
   $("#toastStack").appendChild(item);
-  setTimeout(() => item.remove(), 3600);
+  setTimeout(() => {
+    item.classList.add("leaving");
+    setTimeout(() => item.remove(), 220);
+  }, 3600);
 }
 
 function getAuthLoginId() {
