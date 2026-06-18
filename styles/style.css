@@ -115,7 +115,6 @@ body {
     transform: translate3d(52px, 52px, 0);
   }
 }
-
 @keyframes fusionOrbFloat {
   from {
     transform: translate3d(0, 0, 0) scale(1);

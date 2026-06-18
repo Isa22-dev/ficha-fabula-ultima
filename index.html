@@ -338,48 +338,23 @@
 
         <!-- Aba Dados -->
         <div class="session-tab-content" data-tab="dice">
-          <div class="dice-container">
-            <!-- Controles de Dados -->
-            <div class="dice-controls-panel">
-              <div class="dice-buttons">
-                <button class="dice-btn" data-dice="d4">d4</button>
-                <button class="dice-btn" data-dice="d6">d6</button>
-                <button class="dice-btn" data-dice="d8">d8</button>
-                <button class="dice-btn" data-dice="d10">d10</button>
-                <button class="dice-btn" data-dice="d12">d12</button>
-                <button class="dice-btn" data-dice="d20">d20</button>
-              </div>
+          <div class="dice-panel">
+            <div class="dice-box" id="diceBox">d20</div>
 
-              <!-- Seleção de Quantidade -->
-              <div class="dice-quantity-panel">
-                <label for="diceQuantity">Quantidade:</label>
-                <select id="diceQuantity">
-                  <option value="1">1</option>
-                  <option value="2">2</option>
-                  <option value="3">3</option>
-                  <option value="4">4</option>
-                  <option value="5">5</option>
-                  <option value="10">10</option>
-                </select>
-              </div>
-
-              <!-- Resultado -->
-              <div class="dice-result-display">
-                <strong id="diceResult">Escolha um dado</strong>
-              </div>
+            <div class="dice-controls">
+              <button class="dice-btn" onclick="rollDice(4)">d4</button>
+              <button class="dice-btn" onclick="rollDice(6)">d6</button>
+              <button class="dice-btn" onclick="rollDice(8)">d8</button>
+              <button class="dice-btn" onclick="rollDice(10)">d10</button>
+              <button class="dice-btn" onclick="rollDice(12)">d12</button>
+              <button class="dice-btn" onclick="rollDice(20)">d20</button>
             </div>
 
-            <!-- Histórico -->
+            <div class="dice-result" id="diceResult">Resultado: —</div>
+
             <div class="dice-history">
-              <div class="history-header">
-                <h3>Histórico</h3>
-                <button class="ghost-button mini" id="clearHistoryBtn" title="Limpar histórico">
-                  <i class="ti ti-trash"></i>
-                </button>
-              </div>
-              <div class="history-list" id="historyList">
-                <p class="empty-state">Nenhuma rolagem realizada</p>
-              </div>
+              <h3>Histórico</h3>
+              <div id="diceHistory"></div>
             </div>
           </div>
         </div>

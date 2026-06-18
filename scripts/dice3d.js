@@ -1,133 +1,166 @@
 /**
- * Dice Module - Sistema de Dados Simples e Leve
- * Rolagem de dados pura em JavaScript (sem dependências externas)
+ * Dice System - Simples e Direto
+ * Sem dependências externas - JavaScript puro
  */
 
-const Dice3D = (() => {
-  let isRolling = false;
-  let isInitialized = false;
+let rollHistory = [];
 
-  const DICE_CONFIGS = {
-    d4: { faces: 4, label: "d4" },
-    d6: { faces: 6, label: "d6" },
-    d8: { faces: 8, label: "d8" },
-    d10: { faces: 10, label: "d10" },
-    d12: { faces: 12, label: "d12" },
-    d20: { faces: 20, label: "d20" }
-  };
+/**
+ * Rola um dado
+ * @param {number} lados - Número de lados do dado
+ */
+function rollDice(lados) {
+  const resultado = Math.floor(Math.random() * lados) + 1;
+  const tipo = `d${lados}`;
+  const timestamp = new Date().toLocaleTimeString('pt-BR');
 
-  /**
-   * Inicializa o módulo
-   */
-  function init() {
-    try {
-      bindDiceButtons();
-      isInitialized = true;
-      console.log("✓ Dice Module inicializado com sucesso");
-    } catch (error) {
-      console.error("✗ Erro ao inicializar Dice Module:", error);
-    }
+  // Atualiza o display do resultado
+  document.getElementById('diceResult').textContent = `Resultado: ${resultado}`;
+  document.getElementById('diceBox').textContent = resultado;
+
+  // Adiciona ao histórico
+  rollHistory.push({
+    tipo: tipo,
+    resultado: resultado,
+    timestamp: timestamp
+  });
+
+  // Limita a 50 itens
+  if (rollHistory.length > 50) {
+    rollHistory.shift();
   }
 
-  /**
-   * Vincula os botões de dados
-   */
-  function bindDiceButtons() {
-    const diceBtns = document.querySelectorAll(".dice-btn");
-    diceBtns.forEach((btn) => {
-      btn.addEventListener("click", handleDiceClick);
-    });
+  // Atualiza o histórico na tela
+  updateHistoryDisplay();
+
+  // Registra no painel de sessão se disponível
+  if (window.SessionPanel && typeof window.SessionPanel.registerRollResult === 'function') {
+    window.SessionPanel.registerRollResult(tipo, 1, [resultado], resultado);
+  }
+}
+
+/**
+ * Rola múltiplos dados
+ * @param {number} lados - Número de lados
+ * @param {number} quantidade - Quantos dados rolar
+ */
+function rollMultipleDice(lados, quantidade) {
+  const resultados = [];
+  for (let i = 0; i < quantidade; i++) {
+    resultados.push(Math.floor(Math.random() * lados) + 1);
+  }
+  const total = resultados.reduce((a, b) => a + b, 0);
+  const tipo = `${quantidade}d${lados}`;
+  const timestamp = new Date().toLocaleTimeString('pt-BR');
+
+  // Atualiza o display
+  const detalhe = resultados.join(' + ');
+  document.getElementById('diceResult').textContent = `${tipo}: ${detalhe} = ${total}`;
+
+  // Adiciona ao histórico
+  rollHistory.push({
+    tipo: tipo,
+    resultado: total,
+    timestamp: timestamp,
+    detalhes: resultados
+  });
+
+  // Limita a 50 itens
+  if (rollHistory.length > 50) {
+    rollHistory.shift();
   }
 
-  /**
-   * Manipula o clique em um botão de dado
-   */
-  function handleDiceClick(e) {
-    if (!isInitialized || isRolling) return;
+  // Atualiza o histórico na tela
+  updateHistoryDisplay();
 
-    const diceType = e.currentTarget.dataset.dice;
-    const quantity = parseInt(document.getElementById("diceQuantity")?.value || 1);
+  // Registra no painel de sessão se disponível
+  if (window.SessionPanel && typeof window.SessionPanel.registerRollResult === 'function') {
+    window.SessionPanel.registerRollResult(tipo, quantidade, resultados, total);
+  }
+}
 
-    rollDice(diceType, quantity);
+/**
+ * Atualiza a exibição do histórico
+ */
+function updateHistoryDisplay() {
+  const historyContainer = document.getElementById('diceHistory');
+  if (!historyContainer) return;
+
+  if (rollHistory.length === 0) {
+    historyContainer.innerHTML = '<p class="empty-history">Nenhuma rolagem realizada</p>';
+    return;
   }
 
-  /**
-   * Rola dados com animação simples
-   */
-  function rollDice(diceType, quantity = 1) {
-    if (isRolling) return;
+  // Mostra os últimos 10 itens
+  const recentRolls = rollHistory.slice(-10).reverse();
+  historyContainer.innerHTML = recentRolls
+    .map(
+      (roll) => `
+        <div class="history-item">
+          <span class="history-time">${roll.timestamp}</span>
+          <span class="history-type">${roll.tipo}</span>
+          <span class="history-result">${roll.resultado}</span>
+        </div>
+      `
+    )
+    .join('');
+}
 
-    isRolling = true;
-    const config = DICE_CONFIGS[diceType];
-    const resultDisplay = document.getElementById("diceResult");
-    if (!resultDisplay) return;
+/**
+ * Limpa o histórico
+ */
+function clearHistory() {
+  if (confirm('Tem certeza que quer limpar o histórico?')) {
+    rollHistory = [];
+    updateHistoryDisplay();
+    document.getElementById('diceResult').textContent = 'Resultado: —';
+  }
+}
 
-    // Limpa resultado anterior
-    resultDisplay.textContent = "Rolando...";
-    resultDisplay.style.opacity = "0.5";
-
-    // Anima o giro rápido
-    let frame = 0;
-    const animationFrames = 20;
-
-    function showAnimationFrame() {
-      frame++;
-      const randomNum = Math.floor(Math.random() * config.faces) + 1;
-      resultDisplay.textContent = randomNum;
-
-      if (frame < animationFrames) {
-        setTimeout(showAnimationFrame, 50);
-      } else {
-        // Resultado final
-        finalizeRoll(diceType, quantity, config);
-      }
-    }
-
-    showAnimationFrame();
+/**
+ * Exporta o histórico como texto
+ */
+function exportHistory() {
+  if (rollHistory.length === 0) {
+    alert('Nenhuma rolagem para exportar');
+    return;
   }
 
-  /**
-   * Finaliza a rolagem e calcula o resultado
-   */
-  function finalizeRoll(diceType, quantity, config) {
-    const results = [];
+  let texto = 'Histórico de Rolagens de Dados\n';
+  texto += '================================\n\n';
 
-    // Gera resultados para cada dado
-    for (let i = 0; i < quantity; i++) {
-      results.push(Math.floor(Math.random() * config.faces) + 1);
-    }
+  rollHistory.forEach((roll) => {
+    texto += `${roll.timestamp} | ${roll.tipo} | ${roll.resultado}\n`;
+  });
 
-    const total = results.reduce((a, b) => a + b, 0);
-    const resultDisplay = document.getElementById("diceResult");
+  // Cria o arquivo
+  const element = document.createElement('a');
+  element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(texto));
+  element.setAttribute('download', `historico-dados-${new Date().toISOString().split('T')[0]}.txt`);
+  element.style.display = 'none';
+  document.body.appendChild(element);
+  element.click();
+  document.body.removeChild(element);
+}
 
-    // Exibe resultado
-    if (quantity === 1) {
-      resultDisplay.textContent = `${diceType}: ${results[0]}`;
+/**
+ * API para compatibilidade com código antigo
+ */
+const Dice3D = {
+  init: () => {
+    console.log('✓ Dice System inicializado');
+  },
+  isInitialized: () => true,
+  rollDice: (tipo, quantidade = 1) => {
+    const lados = parseInt(tipo.replace('d', ''));
+    if (quantidade === 1) {
+      rollDice(lados);
     } else {
-      resultDisplay.textContent = `${quantity}${diceType}: ${results.join(" + ")} = ${total}`;
+      rollMultipleDice(lados, quantidade);
     }
-
-    resultDisplay.style.opacity = "1";
-
-    // Registra no histórico
-    if (window.SessionPanel) {
-      window.SessionPanel.registerRollResult(diceType, quantity, results, total);
-    }
-
-    isRolling = false;
-  }
-
-  /**
-   * Função auxiliar: rolar um único dado
-   */
-  function rolarDado(lados) {
-    return Math.floor(Math.random() * lados) + 1;
-  }
-
-  /**
-   * Função auxiliar: rolar múltiplos dados
-   */
-  function rolarMultiplosDados(lados, quantidade) {
+  },
+  rolarDado: (lados) => Math.floor(Math.random() * lados) + 1,
+  rolarMultiplosDados: (lados, quantidade) => {
     const results = [];
     for (let i = 0; i < quantidade; i++) {
       results.push(Math.floor(Math.random() * lados) + 1);
@@ -136,32 +169,25 @@ const Dice3D = (() => {
       results: results,
       total: results.reduce((a, b) => a + b, 0)
     };
+  },
+  atualizarHistorico: (tipo, resultados, total) => {
+    // Função auxiliar
+    const timestamp = new Date().toLocaleTimeString('pt-BR');
+    rollHistory.push({
+      tipo: tipo,
+      resultado: total,
+      timestamp: timestamp,
+      detalhes: resultados
+    });
+    updateHistoryDisplay();
   }
+};
 
-  /**
-   * Função auxiliar: atualizar histórico
-   */
-  function atualizarHistorico(tipo, resultados, total) {
-    if (window.SessionPanel) {
-      window.SessionPanel.registerRollResult(tipo, resultados.length, resultados, total);
-    }
-  }
-
-  return {
-    init: init,
-    isInitialized: () => isInitialized,
-    rollDice: rollDice,
-    rolarDado: rolarDado,
-    rolarMultiplosDados: rolarMultiplosDados,
-    atualizarHistorico: atualizarHistorico
-  };
-})();
-
-// Inicializa quando o DOM estiver pronto
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => {
-    setTimeout(() => Dice3D.init(), 500);
+// Inicializa automaticamente
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    Dice3D.init();
   });
 } else {
-  setTimeout(() => Dice3D.init(), 500);
+  Dice3D.init();
 }
