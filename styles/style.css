@@ -2187,6 +2187,7 @@ select:focus {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  margin-bottom: 10px;
 }
 
 .history-header h3 {
@@ -2198,6 +2199,22 @@ select:focus {
   color: var(--muted);
 }
 
+#clearHistoryBtn {
+  background: #171020;
+  border: 1px solid #d8b56d;
+  color: #d8b56d;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+#clearHistoryBtn:hover {
+  background: #9b5de5;
+  border-color: #9b5de5;
+  color: white;
+}
+
 .history-list {
   flex: 1;
   overflow-y: auto;
@@ -2205,6 +2222,13 @@ select:focus {
   flex-direction: column;
   gap: 6px;
   font-size: 12px;
+}
+
+.history-empty {
+  opacity: .6;
+  text-align: center;
+  padding: 15px;
+  font-style: italic;
 }
 
 .history-item {

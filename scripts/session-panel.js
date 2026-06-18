@@ -6,7 +6,7 @@
 const SessionPanel = (() => {
   const STORAGE_KEYS = {
     NOTES: "rpg_session_notes",
-    HISTORY: "rpg_session_history"
+    HISTORY: "diceHistory"
   };
 
   const SUPABASE_TABLE = "anotacoes_sessao";
@@ -38,6 +38,7 @@ const SessionPanel = (() => {
    */
   function init() {
     cacheDOMElements();
+    window.clearDiceHistory = clearDiceHistory;
     bindEvents();
     initSupabase();
     loadNotes();
@@ -368,7 +369,7 @@ const SessionPanel = (() => {
     const history = getHistory();
 
     if (history.length === 0) {
-      elements.historyList.innerHTML = '<p class="empty-state">Nenhuma rolagem realizada</p>';
+      elements.historyList.innerHTML = '<div class="history-empty">Nenhuma rolagem registrada.</div>';
       return;
     }
 
@@ -392,11 +393,15 @@ const SessionPanel = (() => {
    * Limpa o histórico
    */
   function handleClearHistory() {
-    if (confirm("Tem certeza que deseja limpar o histórico de rolagens?")) {
+    if (confirm("Deseja realmente apagar todo o histórico de rolagens?")) {
       localStorage.removeItem(STORAGE_KEYS.HISTORY);
       updateHistoryDisplay();
-      toast("Histórico limpado", "info");
+      toast("Histórico apagado com sucesso.", "info");
     }
+  }
+
+  function clearDiceHistory() {
+    handleClearHistory();
   }
 
   /**

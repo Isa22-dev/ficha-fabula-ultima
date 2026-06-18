@@ -353,8 +353,13 @@
             <div class="dice-result" id="diceResult">Resultado: —</div>
 
             <div class="dice-history">
-              <h3>Histórico</h3>
-              <div id="diceHistory"></div>
+              <div class="history-header">
+                <h3>Histórico</h3>
+                <button class="ghost-button" type="button" id="clearHistoryBtn" onclick="clearDiceHistory()">
+                  Limpar Histórico
+                </button>
+              </div>
+              <div class="history-list" id="diceHistory"></div>
             </div>
           </div>
         </div>
