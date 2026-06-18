@@ -1,6 +1,7 @@
 const db = window.supabaseClient;
 const backupKey = "ficha-fabula-ultima-backup";
 const themeKey = "ficha-fabula-ultima-theme";
+const hudStateKey = "ficha-fabula-ultima-floating-hud";
 
 const diceTypes = [4, 6, 8, 10, 12, 20];
 const attributes = ["DES", "VIG", "AST", "VON"];
@@ -66,6 +67,9 @@ let pendingSave = false;
 let sheetList = [];
 let deleteModalOpen = false;
 let pendingDeleteId = null;
+let hudLastValues = {};
+let hudTypingTimer = null;
+let hudLastName = "";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -77,6 +81,7 @@ async function init() {
   renderStaticControls();
   bindEvents();
   applySavedTheme();
+  initFloatingHud();
   setLoading(true);
   const { data } = await db.auth.getSession();
   user = data.session?.user || null;
@@ -179,6 +184,7 @@ function bindEvents() {
   $("#profilePhotoInput").addEventListener("change", importarFotoPerfil);
   $("#removePhotoBtn").addEventListener("click", removerFotoPerfil);
   $("#themeButton").addEventListener("click", toggleThemeMenu);
+  $("#hudToggle").addEventListener("click", toggleFloatingHud);
   $("#sheetSelect").addEventListener("change", () => carregarFicha($("#sheetSelect").value));
   $("#addMemory").addEventListener("click", addMemory);
   $("#addEquipment").addEventListener("click", addEquipment);
@@ -244,6 +250,7 @@ function clearActiveSheet() {
   clearTimeout(autosaveTimer);
   $("#sheetSelect").value = "";
   updateWorkspaceState();
+  updateFloatingHud();
 }
 
 function hydrateForm() {
@@ -265,6 +272,7 @@ function hydrateForm() {
 function renderAll() {
   if (!state) {
     updateWorkspaceState();
+    updateFloatingHud();
     return;
   }
   renderResources();
@@ -275,6 +283,7 @@ function renderAll() {
   renderProfilePhoto();
   renderPreview();
   updateWorkspaceState();
+  updateFloatingHud();
 }
 
 function renderAttributeRollPlaceholder(attr) {
@@ -292,13 +301,17 @@ function renderProfilePhoto() {
 }
 
 function renderResources() {
-  if (!state) return;
+  if (!state) {
+    updateFloatingHud();
+    return;
+  }
   resources.forEach(({ key }) => {
     const resource = state.recursos[key];
     const percent = Math.max(0, Math.min(100, Math.round((resource.atual / Math.max(resource.maximo, 1)) * 100)));
     $(`#${key}Bar`).style.width = `${percent}%`;
     $(`#${key}Percent`).textContent = `${percent}%`;
   });
+  updateFloatingHud();
 }
 
 function renderMemories() {
@@ -1027,6 +1040,7 @@ function markDirty() {
   if (!state) return;
   isDirty = true;
   saveLocalBackup();
+  updateFloatingHud();
   renderPreview();
   clearTimeout(autosaveTimer);
 }
@@ -1043,6 +1057,100 @@ function createLocalId() {
 
 function setLoading(active) {
   $("#loadingScreen").classList.toggle("hidden", !active);
+}
+
+function initFloatingHud() {
+  const collapsed = localStorage.getItem(hudStateKey) === "collapsed";
+  const hud = $("#floatingHud");
+  hud.classList.toggle("collapsed", collapsed);
+  updateHudToggleIcon();
+  updateFloatingHud({ initial: true });
+}
+
+function updateFloatingHud(options = {}) {
+  const initial = options.initial === true;
+  const name = state?.nome?.trim() || "Sem ficha";
+  const level = state?.nivel || "-";
+  const resourcesData = {
+    pv: state?.recursos?.pv || { atual: 0, maximo: 0 },
+    pm: state?.recursos?.pm || { atual: 0, maximo: 0 },
+    pf: state?.recursos?.pf || { atual: 0, maximo: 0 }
+  };
+
+  if (name !== hudLastName || initial) {
+    typeHudName(name);
+    hudLastName = name;
+  }
+
+  $("#hudLevel").textContent = `Nv. ${level}`;
+
+  Object.entries(resourcesData).forEach(([type, resource]) => {
+    const atual = Number(resource.atual || 0);
+    const maximo = Number(resource.maximo || 0);
+    const percent = maximo > 0 ? Math.max(0, Math.min(100, Math.round((atual / maximo) * 100))) : 0;
+    const previous = hudLastValues[type];
+    const fill = $(`#hud${capitalize(type)}Fill`);
+    const text = $(`#hud${capitalize(type)}Text`);
+
+    text.textContent = `${atual}/${maximo}`;
+    fill.style.width = `${percent}%`;
+
+    if (type === "pv") $("#hudMiniPv").style.width = `${percent}%`;
+    if (previous && (previous.atual !== atual || previous.maximo !== maximo)) {
+      const direction = atual < previous.atual ? "damage" : atual > previous.atual ? "heal" : "pulse";
+      animateHudBar(type, direction);
+    } else if (initial) {
+      animateHudBar(type, "load");
+    }
+
+    hudLastValues[type] = { atual, maximo };
+  });
+}
+
+function toggleFloatingHud() {
+  const hud = $("#floatingHud");
+  const collapsed = hud.classList.toggle("collapsed");
+  localStorage.setItem(hudStateKey, collapsed ? "collapsed" : "expanded");
+  updateHudToggleIcon();
+}
+
+function animateHudBar(type, effect = "pulse") {
+  const fill = $(`#hud${capitalize(type)}Fill`);
+  if (!fill) return;
+  const effectClass = type === "pm" && effect === "pulse" ? "energy" : type === "pf" && effect === "pulse" ? "magic" : effect;
+  fill.classList.remove("damage", "heal", "energy", "magic");
+  void fill.offsetWidth;
+  if (["damage", "heal", "energy", "magic"].includes(effectClass)) fill.classList.add(effectClass);
+  setTimeout(() => fill.classList.remove("damage", "heal", "energy", "magic"), 680);
+}
+
+function typeHudName(name) {
+  const target = $("#hudName");
+  clearInterval(hudTypingTimer);
+  target.classList.add("typing");
+  target.textContent = "";
+  const text = name.toUpperCase();
+  let index = 0;
+  hudTypingTimer = setInterval(() => {
+    target.textContent = text.slice(0, index + 1);
+    index += 1;
+    if (index >= text.length) {
+      clearInterval(hudTypingTimer);
+      setTimeout(() => target.classList.remove("typing"), 450);
+    }
+  }, 42);
+}
+
+function updateHudToggleIcon() {
+  const collapsed = $("#floatingHud").classList.contains("collapsed");
+  const icon = $("#hudToggle i");
+  $("#hudToggle").setAttribute("aria-label", collapsed ? "Expandir HUD" : "Recolher HUD");
+  $("#hudToggle").setAttribute("title", collapsed ? "Expandir HUD" : "Recolher HUD");
+  icon.className = collapsed ? "ti ti-chevron-right" : "ti ti-chevron-left";
+}
+
+function capitalize(value) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function toast(message, type = "success") {
@@ -1189,3 +1297,7 @@ window.carregarFichaSupabase = carregarFichaSupabase;
 window.atualizarFichaSupabase = atualizarFichaSupabase;
 window.excluirFichaSupabase = excluirFichaSupabase;
 window.listarFichasSupabase = listarFichasSupabase;
+window.initFloatingHud = initFloatingHud;
+window.updateFloatingHud = updateFloatingHud;
+window.toggleFloatingHud = toggleFloatingHud;
+window.animateHudBar = animateHudBar;

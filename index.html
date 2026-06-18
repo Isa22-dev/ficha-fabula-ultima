@@ -17,6 +17,36 @@
       <div class="fusion-orb fusion-orb-c"></div>
       <div class="fusion-scanline"></div>
     </div>
+    <aside class="floating-hud" id="floatingHud" aria-label="Resumo do personagem">
+      <button class="hud-toggle" type="button" id="hudToggle" aria-label="Recolher HUD" title="Recolher HUD">
+        <i class="ti ti-chevron-left"></i>
+      </button>
+      <div class="hud-avatar" aria-hidden="true">FU</div>
+      <div class="hud-content">
+        <header class="hud-header">
+          <div>
+            <strong class="hud-name" id="hudName">SEM FICHA</strong>
+            <span class="hud-level" id="hudLevel">Nv. -</span>
+          </div>
+        </header>
+        <div class="hud-resource" data-hud-resource="pv">
+          <span>PV</span>
+          <strong id="hudPvText">0/0</strong>
+          <div class="hud-track"><div class="hud-fill pv" id="hudPvFill"></div></div>
+        </div>
+        <div class="hud-resource" data-hud-resource="pm">
+          <span>PM</span>
+          <strong id="hudPmText">0/0</strong>
+          <div class="hud-track"><div class="hud-fill pm" id="hudPmFill"></div></div>
+        </div>
+        <div class="hud-resource" data-hud-resource="pf">
+          <span>PF</span>
+          <strong id="hudPfText">0/0</strong>
+          <div class="hud-track"><div class="hud-fill pf" id="hudPfFill"></div></div>
+        </div>
+      </div>
+      <div class="hud-mini-track" aria-hidden="true"><span id="hudMiniPv"></span></div>
+    </aside>
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand">
