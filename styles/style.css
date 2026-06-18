@@ -548,6 +548,47 @@ label,
   pointer-events: none;
 }
 
+.sheet-form {
+  position: relative;
+}
+
+.back-library-button {
+  position: sticky;
+  top: 80px;
+  z-index: 9;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  margin: 0 0 16px;
+  padding: 0 14px;
+  border: 1px solid rgba(216, 181, 109, 0.58);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(10, 7, 16, 0.82);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(14px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.back-library-button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(var(--accent-rgb), 0.82);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.32), 0 0 24px rgba(var(--accent-rgb), 0.22);
+}
+
+.sheet-form.leaving {
+  animation: editorFadeOut 0.24s ease both;
+}
+
+.arcane-library.entering {
+  animation: libraryFadeIn 0.32s ease both;
+}
+
+.sidebar.leaving {
+  animation: sidebarSlideOut 0.26s ease both;
+}
+
 .tab-panel {
   display: none;
   padding: clamp(16px, 2.4vw, 28px);
@@ -951,6 +992,31 @@ label,
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+@keyframes editorFadeOut {
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes sidebarSlideOut {
+  to {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+}
+
+@keyframes libraryFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -1701,6 +1767,10 @@ select:focus {
   margin-top: 22px;
 }
 
+.modal-actions-wide {
+  flex-wrap: wrap;
+}
+
 @keyframes modalBackdropIn {
   from {
     opacity: 0;
@@ -1832,6 +1902,13 @@ select:focus {
 
   .top-actions {
     width: 100%;
+  }
+
+  .back-library-button {
+    position: sticky;
+    top: 8px;
+    width: 100%;
+    justify-content: center;
   }
 
   .book-grid {

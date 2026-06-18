@@ -67,6 +67,7 @@ let sheetList = [];
 let deleteModalOpen = false;
 let pendingDeleteId = null;
 let selectedLibraryId = null;
+let unsavedModalOpen = false;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -187,6 +188,12 @@ function bindEvents() {
   $("#deleteModal").addEventListener("click", (event) => {
     if (event.target.id === "deleteModal") fecharModalExclusao(true);
   });
+  $("#cancelUnsavedBtn").addEventListener("click", fecharModalAlteracoes);
+  $("#discardUnsavedBtn").addEventListener("click", voltarSemSalvar);
+  $("#saveAndBackBtn").addEventListener("click", salvarEVoltar);
+  $("#unsavedModal").addEventListener("click", (event) => {
+    if (event.target.id === "unsavedModal") fecharModalAlteracoes();
+  });
   $("#resetBtn").addEventListener("click", resetarFicha);
   $("#exportBtn")?.addEventListener("click", exportarJSON);
   $("#importInput")?.addEventListener("change", importarJSON);
@@ -219,6 +226,10 @@ function bindEvents() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && deleteModalOpen) {
       fecharModalExclusao(true);
+      return;
+    }
+    if (event.key === "Escape" && unsavedModalOpen) {
+      fecharModalAlteracoes();
       return;
     }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
@@ -717,13 +728,68 @@ function mostrarToast(mensagem) {
   toast(mensagem);
 }
 
-async function voltarParaBiblioteca() {
+function voltarParaBiblioteca() {
+  if (!state) {
+    retornarParaBiblioteca();
+    return;
+  }
+  if (verificarAlteracoesPendentes()) {
+    abrirModalAlteracoes();
+    return;
+  }
+  retornarParaBiblioteca();
+}
+
+function verificarAlteracoesPendentes() {
+  return Boolean(state && isDirty);
+}
+
+function abrirModalAlteracoes() {
+  unsavedModalOpen = true;
+  const modal = $("#unsavedModal");
+  modal.classList.remove("hidden", "closing");
+  $("#cancelUnsavedBtn").focus();
+}
+
+function fecharModalAlteracoes() {
+  if (!unsavedModalOpen) return;
+  unsavedModalOpen = false;
+  const modal = $("#unsavedModal");
+  modal.classList.add("closing");
+  setTimeout(() => {
+    modal.classList.add("hidden");
+    modal.classList.remove("closing");
+  }, 180);
+}
+
+async function salvarEVoltar() {
+  fecharModalAlteracoes();
+  await salvarFicha();
+  if (!isDirty) await retornarParaBiblioteca();
+}
+
+async function voltarSemSalvar() {
+  fecharModalAlteracoes();
+  isDirty = false;
+  await retornarParaBiblioteca();
+}
+
+async function retornarParaBiblioteca() {
+  const form = $("#sheetForm");
+  const sidebar = $(".sidebar");
+  form.classList.add("leaving");
+  sidebar.classList.add("leaving");
+  await wait(260);
   state = null;
   isDirty = false;
   clearTimeout(autosaveTimer);
   await carregarBiblioteca();
   $$(".nav-tab").forEach((item) => item.classList.toggle("active", item.id === "libraryNavBtn"));
   updateWorkspaceState();
+  form.classList.remove("leaving");
+  sidebar.classList.remove("leaving");
+  $("#arcaneLibrary").classList.add("entering");
+  setTimeout(() => $("#arcaneLibrary").classList.remove("entering"), 340);
 }
 
 function preencherPainelLeitura(ficha) {
@@ -1192,6 +1258,10 @@ function setLoading(active) {
   $("#loadingScreen").classList.toggle("hidden", !active);
 }
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function toast(message, type = "success") {
   const item = document.createElement("div");
   item.className = `toast ${type}`;
@@ -1331,3 +1401,6 @@ window.excluirFichaComConfirmacao = excluirFichaComConfirmacao;
 window.mostrarEstadoVazio = mostrarEstadoVazio;
 window.mostrarToast = mostrarToast;
 window.voltarParaBiblioteca = voltarParaBiblioteca;
+window.verificarAlteracoesPendentes = verificarAlteracoesPendentes;
+window.abrirModalAlteracoes = abrirModalAlteracoes;
+window.salvarEVoltar = salvarEVoltar;
