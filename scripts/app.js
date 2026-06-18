@@ -1,7 +1,6 @@
 const db = window.supabaseClient;
 const backupKey = "ficha-fabula-ultima-backup";
 const themeKey = "ficha-fabula-ultima-theme";
-const hudStateKey = "ficha-fabula-ultima-floating-hud";
 
 const diceTypes = [4, 6, 8, 10, 12, 20];
 const attributes = ["DES", "VIG", "AST", "VON"];
@@ -68,9 +67,6 @@ let sheetList = [];
 let deleteModalOpen = false;
 let pendingDeleteId = null;
 let selectedLibraryId = null;
-let hudLastValues = {};
-let hudTypingTimer = null;
-let hudLastName = "";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -82,7 +78,6 @@ async function init() {
   renderStaticControls();
   bindEvents();
   applySavedTheme();
-  initFloatingHud();
   setLoading(true);
   const { data } = await db.auth.getSession();
   user = data.session?.user || null;
@@ -95,16 +90,29 @@ async function init() {
 }
 
 function bindNavigation() {
-  $$(".nav-tab").forEach((button) => {
+  $$(".nav-tab[data-tab]").forEach((button) => {
     button.addEventListener("click", () => {
       const tab = button.dataset.tab;
-      $$(".nav-tab").forEach((item) => item.classList.toggle("active", item === button));
-      $$(".tab-panel").forEach((panel) => panel.classList.toggle("active", panel.id === tab));
+      ativarAba(tab);
       $(".sidebar").classList.remove("open");
       if (tab === "visualizacao") renderPreview();
     });
   });
   $("#mobileMenu").addEventListener("click", () => $(".sidebar").classList.toggle("open"));
+}
+
+function abrirConfiguracoes() {
+  if (!state) {
+    toast("Abra uma ficha completa para acessar Configurações.", "danger");
+    return;
+  }
+  ativarAba("configuracoes");
+  $(".sidebar").classList.remove("open");
+}
+
+function ativarAba(tab) {
+  $$(".nav-tab").forEach((item) => item.classList.toggle("active", item.dataset.tab === tab));
+  $$(".tab-panel").forEach((panel) => panel.classList.toggle("active", panel.id === tab));
 }
 
 function renderStaticControls() {
@@ -173,7 +181,6 @@ function bindEvents() {
   $("#emptyNewSheetBtn").addEventListener("click", novaFicha);
   $("#newBookBtn").addEventListener("click", criarNovoLivro);
   $("#newSheetBtnSettings").addEventListener("click", novaFicha);
-  $("#loadSelectedBtn").addEventListener("click", () => carregarFichaSupabase($("#sheetSelect").value));
   $("#deleteBtn").addEventListener("click", abrirModalExclusao);
   $("#cancelDeleteBtn").addEventListener("click", () => fecharModalExclusao(true));
   $("#confirmDeleteBtn").addEventListener("click", confirmarExclusao);
@@ -185,14 +192,10 @@ function bindEvents() {
   $("#importInput")?.addEventListener("change", importarJSON);
   $("#profilePhotoInput").addEventListener("change", importarFotoPerfil);
   $("#removePhotoBtn").addEventListener("click", removerFotoPerfil);
-  $("#themeButton").addEventListener("click", toggleThemeMenu);
-  $("#hudToggle").addEventListener("click", toggleFloatingHud);
+  $("#settingsTopBtn").addEventListener("click", abrirConfiguracoes);
+  $("#libraryNavBtn").addEventListener("click", voltarParaBiblioteca);
   $("#backToLibraryBtn").addEventListener("click", voltarParaBiblioteca);
   $("#openFullSheetBtn").addEventListener("click", abrirFichaSelecionadaCompleta);
-  $("#editBookBtn").addEventListener("click", abrirFichaSelecionadaCompleta);
-  $("#saveBookBtn").addEventListener("click", () => salvarFicha());
-  $("#deleteBookBtn").addEventListener("click", () => excluirFichaComConfirmacao(selectedLibraryId));
-  $("#sheetSelect").addEventListener("change", () => carregarFicha($("#sheetSelect").value));
   $("#addMemory").addEventListener("click", addMemory);
   $("#addEquipment").addEventListener("click", addEquipment);
   $("#addBond").addEventListener("click", addBond);
@@ -210,9 +213,6 @@ function bindEvents() {
     if (book) abrirLivroFicha(book.dataset.bookId);
     if (themeOption) {
       setTheme(themeOption.dataset.themeOption);
-      closeThemeMenu();
-    } else if (!event.target.closest("#themeMenu")) {
-      closeThemeMenu();
     }
   });
 
@@ -242,11 +242,11 @@ function updateWorkspaceState() {
   const hasSheet = Boolean(state);
   const libraryVisible = hasUser && !hasSheet;
   $("#arcaneLibrary").classList.toggle("hidden", !libraryVisible);
+  if (libraryVisible) $$(".nav-tab").forEach((item) => item.classList.toggle("active", item.id === "libraryNavBtn"));
   $("#sheetForm").classList.toggle("hidden", !hasUser || !hasSheet);
   $("#emptyState").classList.add("hidden");
   $("#backToLibraryBtn").classList.toggle("hidden", !hasUser || !hasSheet);
   $("#saveBtnTop").disabled = !hasUser || !hasSheet;
-  $("#loadSelectedBtn").disabled = !hasUser || !$("#sheetSelect").value;
   $("#deleteBtn").disabled = !hasUser || !state?.id;
   $("#exportBtn").disabled = !hasSheet;
   $("#resetBtn").disabled = !hasSheet;
@@ -258,9 +258,7 @@ function clearActiveSheet() {
   isDirty = false;
   pendingSave = false;
   clearTimeout(autosaveTimer);
-  $("#sheetSelect").value = "";
   updateWorkspaceState();
-  updateFloatingHud();
   renderizarLivros(sheetList);
 }
 
@@ -283,7 +281,6 @@ function hydrateForm() {
 function renderAll() {
   if (!state) {
     updateWorkspaceState();
-    updateFloatingHud();
     return;
   }
   renderResources();
@@ -294,7 +291,6 @@ function renderAll() {
   renderProfilePhoto();
   renderPreview();
   updateWorkspaceState();
-  updateFloatingHud();
 }
 
 function renderAttributeRollPlaceholder(attr) {
@@ -313,7 +309,6 @@ function renderProfilePhoto() {
 
 function renderResources() {
   if (!state) {
-    updateFloatingHud();
     return;
   }
   resources.forEach(({ key }) => {
@@ -322,7 +317,6 @@ function renderResources() {
     $(`#${key}Bar`).style.width = `${percent}%`;
     $(`#${key}Percent`).textContent = `${percent}%`;
   });
-  updateFloatingHud();
 }
 
 function renderMemories() {
@@ -473,7 +467,6 @@ async function refreshAuthState() {
   $("#authPanel").classList.toggle("hidden", Boolean(user));
   if (!user) {
     clearActiveSheet();
-    $("#sheetSelect").innerHTML = `<option value="">Fichas salvas</option>`;
     $("#bookGrid").innerHTML = "";
     $("#readingPanel").classList.add("hidden");
     updateWorkspaceState();
@@ -517,7 +510,6 @@ async function salvarFicha(options = {}) {
     isDirty = false;
     if (!silent) {
       await carregarBiblioteca();
-      $("#sheetSelect").value = state.id;
       selectedLibraryId = state.id;
       updateWorkspaceState();
       toast(isUpdate ? "Ficha atualizada com sucesso." : "Ficha salva com sucesso.");
@@ -558,7 +550,8 @@ async function carregarFicha(id) {
   isDirty = false;
   hydrateForm();
   renderAll();
-  toast("Ficha carregada.");
+  ativarAba("identidade");
+  toast("Ficha carregada com sucesso.");
 }
 
 async function carregarFichaSupabase(id) {
@@ -639,8 +632,6 @@ async function carregarBiblioteca() {
 }
 
 async function listarFichas() {
-  const select = $("#sheetSelect");
-  select.innerHTML = `<option value="">Fichas salvas</option>`;
   sheetList = [];
   if (!user) return [];
   const { data, error } = await db
@@ -651,16 +642,9 @@ async function listarFichas() {
   if (error) return handleSupabaseError(error, false);
   sheetList = filtrarFichasPersistidas(data || []);
   if (!sheetList.length) {
-    select.innerHTML = `<option value="">Nenhuma ficha encontrada</option>`;
     renderizarLivros([]);
     if (!state?.id) clearActiveSheet();
     return sheetList;
-  }
-  select.innerHTML += sheetList.map((sheet) => `<option value="${sheet.id}">${escapeHtml(sheet.nome || "Sem nome")} - Nv ${sheet.nivel || 1}</option>`).join("");
-  if (state?.id && sheetList.some((sheet) => sheet.id === state.id)) {
-    select.value = state.id;
-  } else if (!state?.id) {
-    select.value = "";
   }
   renderizarLivros(sheetList);
   updateWorkspaceState();
@@ -681,7 +665,7 @@ async function renderizarLivros(fichas) {
   }
   grid.innerHTML = fichas.map((ficha, index) => {
     const personagem = ficha.personagem || {};
-    const nome = ficha.nome || personagem.identidade?.nome || "Livro sem titulo";
+    const nome = ficha.nome || personagem.identidade?.nome || "Ficha sem titulo";
     const classe = ficha.classe || personagem.identidade?.classe || "Classe indefinida";
     const nivel = ficha.nivel || personagem.identidade?.nivel || 1;
     const tema = ficha.tema || personagem.identidade?.tema || "Tema oculto";
@@ -723,7 +707,7 @@ function mostrarEstadoVazio() {
   $("#bookGrid").innerHTML = `
     <div class="library-empty">
       <h3>Nenhuma ficha encontrada.</h3>
-      <p>Clique em Novo Livro para criar sua primeira ficha.</p>
+      <p>Clique em Nova Ficha para criar sua primeira ficha.</p>
     </div>
   `;
   $("#readingPanel").classList.add("hidden");
@@ -738,8 +722,8 @@ async function voltarParaBiblioteca() {
   isDirty = false;
   clearTimeout(autosaveTimer);
   await carregarBiblioteca();
+  $$(".nav-tab").forEach((item) => item.classList.toggle("active", item.id === "libraryNavBtn"));
   updateWorkspaceState();
-  updateFloatingHud();
 }
 
 function preencherPainelLeitura(ficha) {
@@ -773,7 +757,7 @@ function atualizarRecursoLeitura(label, recurso) {
 }
 
 async function abrirFichaSelecionadaCompleta() {
-  if (!selectedLibraryId) return toast("Selecione um livro para abrir.", "danger");
+  if (!selectedLibraryId) return toast("Selecione uma ficha para abrir.", "danger");
   await carregarFicha(selectedLibraryId);
 }
 
@@ -784,7 +768,7 @@ function resumoFicha(ficha) {
   const recursosFicha = personagem.recursos || {};
   const memorias = Array.isArray(personagem.memorias) ? personagem.memorias.slice(0, 3) : [];
   return {
-    nome: ficha.nome || identidade.nome || "Livro sem titulo",
+    nome: ficha.nome || identidade.nome || "Ficha sem titulo",
     classe: ficha.classe || identidade.classe || "Classe indefinida",
     nivel: ficha.nivel || identidade.nivel || 1,
     tema: ficha.tema || identidade.tema || "Tema oculto",
@@ -851,9 +835,9 @@ function novaFicha() {
   isDirty = false;
   hydrateForm();
   renderAll();
-  $("#sheetSelect").value = "";
+  ativarAba("identidade");
   updateWorkspaceState();
-  toast("Novo livro pronto para preencher.");
+  toast("Nova ficha pronta para preencher.");
 }
 
 function resetarFicha() {
@@ -1190,7 +1174,6 @@ function markDirty() {
   if (!state) return;
   isDirty = true;
   saveLocalBackup();
-  updateFloatingHud();
   renderPreview();
   clearTimeout(autosaveTimer);
 }
@@ -1207,100 +1190,6 @@ function createLocalId() {
 
 function setLoading(active) {
   $("#loadingScreen").classList.toggle("hidden", !active);
-}
-
-function initFloatingHud() {
-  const collapsed = localStorage.getItem(hudStateKey) === "collapsed";
-  const hud = $("#floatingHud");
-  hud.classList.toggle("collapsed", collapsed);
-  updateHudToggleIcon();
-  updateFloatingHud({ initial: true });
-}
-
-function updateFloatingHud(options = {}) {
-  const initial = options.initial === true;
-  const name = state?.nome?.trim() || "Sem ficha";
-  const level = state?.nivel || "-";
-  const resourcesData = {
-    pv: state?.recursos?.pv || { atual: 0, maximo: 0 },
-    pm: state?.recursos?.pm || { atual: 0, maximo: 0 },
-    pf: state?.recursos?.pf || { atual: 0, maximo: 0 }
-  };
-
-  if (name !== hudLastName || initial) {
-    typeHudName(name);
-    hudLastName = name;
-  }
-
-  $("#hudLevel").textContent = `Nv. ${level}`;
-
-  Object.entries(resourcesData).forEach(([type, resource]) => {
-    const atual = Number(resource.atual || 0);
-    const maximo = Number(resource.maximo || 0);
-    const percent = maximo > 0 ? Math.max(0, Math.min(100, Math.round((atual / maximo) * 100))) : 0;
-    const previous = hudLastValues[type];
-    const fill = $(`#hud${capitalize(type)}Fill`);
-    const text = $(`#hud${capitalize(type)}Text`);
-
-    text.textContent = `${atual}/${maximo}`;
-    fill.style.width = `${percent}%`;
-
-    if (type === "pv") $("#hudMiniPv").style.width = `${percent}%`;
-    if (previous && (previous.atual !== atual || previous.maximo !== maximo)) {
-      const direction = atual < previous.atual ? "damage" : atual > previous.atual ? "heal" : "pulse";
-      animateHudBar(type, direction);
-    } else if (initial) {
-      animateHudBar(type, "load");
-    }
-
-    hudLastValues[type] = { atual, maximo };
-  });
-}
-
-function toggleFloatingHud() {
-  const hud = $("#floatingHud");
-  const collapsed = hud.classList.toggle("collapsed");
-  localStorage.setItem(hudStateKey, collapsed ? "collapsed" : "expanded");
-  updateHudToggleIcon();
-}
-
-function animateHudBar(type, effect = "pulse") {
-  const fill = $(`#hud${capitalize(type)}Fill`);
-  if (!fill) return;
-  const effectClass = type === "pm" && effect === "pulse" ? "energy" : type === "pf" && effect === "pulse" ? "magic" : effect;
-  fill.classList.remove("damage", "heal", "energy", "magic");
-  void fill.offsetWidth;
-  if (["damage", "heal", "energy", "magic"].includes(effectClass)) fill.classList.add(effectClass);
-  setTimeout(() => fill.classList.remove("damage", "heal", "energy", "magic"), 680);
-}
-
-function typeHudName(name) {
-  const target = $("#hudName");
-  clearInterval(hudTypingTimer);
-  target.classList.add("typing");
-  target.textContent = "";
-  const text = name.toUpperCase();
-  let index = 0;
-  hudTypingTimer = setInterval(() => {
-    target.textContent = text.slice(0, index + 1);
-    index += 1;
-    if (index >= text.length) {
-      clearInterval(hudTypingTimer);
-      setTimeout(() => target.classList.remove("typing"), 450);
-    }
-  }, 42);
-}
-
-function updateHudToggleIcon() {
-  const collapsed = $("#floatingHud").classList.contains("collapsed");
-  const icon = $("#hudToggle i");
-  $("#hudToggle").setAttribute("aria-label", collapsed ? "Expandir HUD" : "Recolher HUD");
-  $("#hudToggle").setAttribute("title", collapsed ? "Expandir HUD" : "Recolher HUD");
-  icon.className = collapsed ? "ti ti-chevron-right" : "ti ti-chevron-left";
-}
-
-function capitalize(value) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function toast(message, type = "success") {
@@ -1351,8 +1240,6 @@ function handleSupabaseError(error, showToast = true) {
   const message = supabaseErrorMessage(error);
   if (isMissingTableError(error)) {
     remoteSaveEnabled = false;
-    const select = $("#sheetSelect");
-    if (select) select.innerHTML = `<option value="">Execute o SQL do Supabase</option>`;
     if (!schemaWarningShown && showToast) {
       schemaWarningShown = true;
       toast(message, "danger");
@@ -1397,17 +1284,6 @@ function setTheme(theme, persist = true) {
     button.classList.toggle("active", button.dataset.themeOption === theme);
   });
   if (persist) localStorage.setItem(themeKey, theme);
-}
-
-function toggleThemeMenu() {
-  const menu = $("#themeMenu");
-  const isOpen = menu.classList.toggle("open");
-  $("#themeButton").setAttribute("aria-expanded", String(isOpen));
-}
-
-function closeThemeMenu() {
-  $("#themeMenu").classList.remove("open");
-  $("#themeButton").setAttribute("aria-expanded", "false");
 }
 
 function skeleton(text) {
@@ -1455,7 +1331,3 @@ window.excluirFichaComConfirmacao = excluirFichaComConfirmacao;
 window.mostrarEstadoVazio = mostrarEstadoVazio;
 window.mostrarToast = mostrarToast;
 window.voltarParaBiblioteca = voltarParaBiblioteca;
-window.initFloatingHud = initFloatingHud;
-window.updateFloatingHud = updateFloatingHud;
-window.toggleFloatingHud = toggleFloatingHud;
-window.animateHudBar = animateHudBar;

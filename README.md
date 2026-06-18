@@ -1,4 +1,4 @@
-# Ficha Fabula Ultima - Visual Fusion
+# Fichas de RPG - Visual Fusion
 
 Aplicacao HTML, CSS e JavaScript puro para fichas de RPG, com Supabase Auth, banco protegido por Row Level Security e deploy estatico na Vercel.
 

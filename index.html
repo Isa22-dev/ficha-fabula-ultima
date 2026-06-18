@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0d0d18" />
-    <title>Ficha Fabula Ultima</title>
+    <title>Fichas de RPG</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
     <link rel="stylesheet" href="./styles/style.css" />
@@ -17,53 +17,23 @@
       <div class="fusion-orb fusion-orb-c"></div>
       <div class="fusion-scanline"></div>
     </div>
-    <aside class="floating-hud" id="floatingHud" aria-label="Resumo do personagem">
-      <button class="hud-toggle" type="button" id="hudToggle" aria-label="Recolher HUD" title="Recolher HUD">
-        <i class="ti ti-chevron-left"></i>
-      </button>
-      <div class="hud-avatar" aria-hidden="true">FU</div>
-      <div class="hud-content">
-        <header class="hud-header">
-          <div>
-            <strong class="hud-name" id="hudName">SEM FICHA</strong>
-            <span class="hud-level" id="hudLevel">Nv. -</span>
-          </div>
-        </header>
-        <div class="hud-resource" data-hud-resource="pv">
-          <span>PV</span>
-          <strong id="hudPvText">0/0</strong>
-          <div class="hud-track"><div class="hud-fill pv" id="hudPvFill"></div></div>
-        </div>
-        <div class="hud-resource" data-hud-resource="pm">
-          <span>PM</span>
-          <strong id="hudPmText">0/0</strong>
-          <div class="hud-track"><div class="hud-fill pm" id="hudPmFill"></div></div>
-        </div>
-        <div class="hud-resource" data-hud-resource="pf">
-          <span>PF</span>
-          <strong id="hudPfText">0/0</strong>
-          <div class="hud-track"><div class="hud-fill pf" id="hudPfFill"></div></div>
-        </div>
-      </div>
-      <div class="hud-mini-track" aria-hidden="true"><span id="hudMiniPv"></span></div>
-    </aside>
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand">
-          <span class="brand-mark">FU</span>
+          <span class="brand-mark">RPG</span>
           <div>
-            <strong>Ficha Fabula Ultima</strong>
-            <small>Terminal de habilidades</small>
+            <strong>Fichas de RPG</strong>
+            <small>Biblioteca de fichas</small>
           </div>
         </div>
         <nav class="nav-tabs" aria-label="Secoes da ficha">
+          <button class="nav-tab" type="button" id="libraryNavBtn"><i class="ti ti-books"></i><span>Biblioteca</span></button>
           <button class="nav-tab active" data-tab="identidade"><i class="ti ti-id"></i><span>Identidade</span></button>
           <button class="nav-tab" data-tab="recursos"><i class="ti ti-heart-bolt"></i><span>Recursos</span></button>
           <button class="nav-tab" data-tab="atributos"><i class="ti ti-dice-5"></i><span>Atributos</span></button>
           <button class="nav-tab" data-tab="memorias"><i class="ti ti-brain"></i><span>Habilidades</span></button>
           <button class="nav-tab" data-tab="equipamentos"><i class="ti ti-sword"></i><span>Equipamentos</span></button>
-          <button class="nav-tab" data-tab="lacos"><i class="ti ti-link"></i><span>Lacos</span></button>
-          <button class="nav-tab" data-tab="dados"><i class="ti ti-cube"></i><span>Dados</span></button>
+          <button class="nav-tab" data-tab="lacos"><i class="ti ti-link"></i><span>Memórias</span></button>
           <button class="nav-tab" data-tab="visualizacao"><i class="ti ti-file-description"></i><span>Visualizacao</span></button>
           <button class="nav-tab" data-tab="configuracoes"><i class="ti ti-settings"></i><span>Configuracoes</span></button>
         </nav>
@@ -73,32 +43,13 @@
         <header class="topbar">
           <button class="icon-button mobile-menu" id="mobileMenu" title="Abrir menu"><i class="ti ti-menu-2"></i></button>
           <div>
-            <h1>Ficha Fabula Ultima</h1>
+            <h1>Fichas de RPG</h1>
           </div>
           <div class="top-actions">
             <button class="ghost-button hidden" type="button" id="backToLibraryBtn"><i class="ti ti-books"></i>Biblioteca</button>
-            <select id="sheetSelect" class="compact-select" title="Fichas salvas"></select>
             <button class="icon-button" id="newSheetBtn" title="Nova ficha"><i class="ti ti-file-plus"></i></button>
             <button class="icon-button" id="saveBtnTop" title="Salvar"><i class="ti ti-device-floppy"></i></button>
-            <div class="theme-menu" id="themeMenu">
-              <button class="theme-menu-button" type="button" id="themeButton" aria-label="Temas" title="Temas" aria-expanded="false" aria-haspopup="true">
-                <i class="ti ti-palette"></i>
-              </button>
-              <div class="theme-options" id="themeOptions" role="menu">
-                <span class="theme-group-label">Escuros</span>
-                <button type="button" data-theme-option="purple"><span class="theme-dot purple"></span>Roxo</button>
-                <button type="button" data-theme-option="red"><span class="theme-dot red"></span>Vermelho</button>
-                <button type="button" data-theme-option="orange"><span class="theme-dot orange"></span>Laranja</button>
-                <button type="button" data-theme-option="green"><span class="theme-dot green"></span>Verde</button>
-                <button type="button" data-theme-option="blue"><span class="theme-dot blue"></span>Azul</button>
-                <span class="theme-group-label">Claros</span>
-                <button type="button" data-theme-option="light-purple"><span class="theme-dot light-purple"></span>Claro roxo</button>
-                <button type="button" data-theme-option="light-red"><span class="theme-dot light-red"></span>Claro vermelho</button>
-                <button type="button" data-theme-option="light-orange"><span class="theme-dot light-orange"></span>Claro laranja</button>
-                <button type="button" data-theme-option="light-green"><span class="theme-dot light-green"></span>Claro verde</button>
-                <button type="button" data-theme-option="light-blue"><span class="theme-dot light-blue"></span>Claro azul</button>
-              </div>
-            </div>
+            <button class="icon-button" type="button" id="settingsTopBtn" title="Configuracoes" aria-label="Configuracoes"><i class="ti ti-settings"></i></button>
           </div>
         </header>
 
@@ -126,11 +77,11 @@
         <section class="arcane-library hidden" id="arcaneLibrary">
           <header class="library-header">
             <div>
-              <p class="eyebrow">Acervo de grimorios</p>
-              <h2>Biblioteca Arcana</h2>
-              <p>Escolha um livro para acessar a ficha salva</p>
+              <p class="eyebrow">Acervo de fichas</p>
+              <h2>Biblioteca de Fichas</h2>
+              <p>Escolha uma ficha para acessar seus dados</p>
             </div>
-            <button class="primary-button" type="button" id="newBookBtn"><i class="ti ti-book-2"></i>Novo Livro</button>
+            <button class="primary-button" type="button" id="newBookBtn"><i class="ti ti-file-plus"></i>Nova Ficha</button>
           </header>
 
           <div class="library-layout">
@@ -138,7 +89,7 @@
 
             <aside class="reading-panel hidden" id="readingPanel">
               <p class="eyebrow">Painel de leitura</p>
-              <h3 id="readingName">Selecione um livro</h3>
+              <h3 id="readingName">Selecione uma ficha</h3>
               <div class="reading-tags">
                 <span id="readingClass">Classe</span>
                 <span id="readingLevel">Nv. -</span>
@@ -166,9 +117,6 @@
               </div>
               <div class="reading-actions">
                 <button class="primary-button" type="button" id="openFullSheetBtn"><i class="ti ti-door-enter"></i>Abrir Ficha Completa</button>
-                <button class="ghost-button" type="button" id="editBookBtn"><i class="ti ti-edit"></i>Editar</button>
-                <button class="ghost-button" type="button" id="saveBookBtn"><i class="ti ti-device-floppy"></i>Salvar</button>
-                <button class="danger-button" type="button" id="deleteBookBtn"><i class="ti ti-trash"></i>Excluir</button>
               </div>
             </aside>
           </div>
@@ -248,7 +196,7 @@
 
           <section class="tab-panel" id="lacos">
             <div class="section-head">
-              <div><p class="eyebrow">Lacos</p><h2>Rede emocional</h2></div>
+              <div><p class="eyebrow">Memórias</p><h2>Memórias e vínculos</h2></div>
               <button class="primary-button" type="button" id="addBond"><i class="ti ti-plus"></i>Adicionar</button>
             </div>
             <div class="card-grid" id="bondList"></div>
@@ -281,8 +229,22 @@
           <section class="tab-panel" id="configuracoes">
             <div class="section-head"><div><p class="eyebrow">Configuracoes</p><h2>Operacoes da ficha</h2></div></div>
             <p class="settings-note">Os dados sao salvos no Supabase e podem ser acessados online apos login.</p>
+            <div class="settings-theme-panel">
+              <h3>Tema, cores e aparencia</h3>
+              <div class="theme-options settings-theme-options" id="themeOptions" role="menu">
+                <button type="button" data-theme-option="purple"><span class="theme-dot purple"></span>Roxo</button>
+                <button type="button" data-theme-option="red"><span class="theme-dot red"></span>Vermelho</button>
+                <button type="button" data-theme-option="orange"><span class="theme-dot orange"></span>Laranja</button>
+                <button type="button" data-theme-option="green"><span class="theme-dot green"></span>Verde</button>
+                <button type="button" data-theme-option="blue"><span class="theme-dot blue"></span>Azul</button>
+                <button type="button" data-theme-option="light-purple"><span class="theme-dot light-purple"></span>Claro roxo</button>
+                <button type="button" data-theme-option="light-red"><span class="theme-dot light-red"></span>Claro vermelho</button>
+                <button type="button" data-theme-option="light-orange"><span class="theme-dot light-orange"></span>Claro laranja</button>
+                <button type="button" data-theme-option="light-green"><span class="theme-dot light-green"></span>Claro verde</button>
+                <button type="button" data-theme-option="light-blue"><span class="theme-dot light-blue"></span>Claro azul</button>
+              </div>
+            </div>
             <div class="settings-grid">
-              <button class="ghost-button" type="button" id="loadSelectedBtn"><i class="ti ti-database-import"></i>Carregar ficha</button>
               <button class="ghost-button" type="button" id="newSheetBtnSettings"><i class="ti ti-file-plus"></i>Nova ficha</button>
               <button class="ghost-button" type="button" id="exportBtn"><i class="ti ti-download"></i>Exportar JSON</button>
               <label class="file-button"><i class="ti ti-upload"></i>Importar JSON<input type="file" id="importInput" accept="application/json" /></label>
