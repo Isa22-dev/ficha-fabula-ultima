@@ -59,6 +59,14 @@
             <button class="primary-button" type="button" id="newBookBtn"><i class="ti ti-file-plus"></i>Nova Ficha</button>
           </header>
 
+          <div class="selection-action-bar hidden" id="selectionActionBar" aria-live="polite">
+            <strong id="selectionCount">0 fichas selecionadas</strong>
+            <div>
+              <button class="danger-button" type="button" id="deleteSelectedBooksBtn"><i class="ti ti-trash"></i>Excluir Selecionadas</button>
+              <button class="ghost-button" type="button" id="cancelBookSelectionBtn"><i class="ti ti-x"></i>Cancelar Seleção</button>
+            </div>
+          </div>
+
           <div class="library-layout">
             <section class="book-grid" id="bookGrid" aria-label="Fichas salvas"></section>
 
@@ -273,7 +281,7 @@
     <div class="modal-backdrop hidden" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
       <div class="confirm-modal">
         <h2 id="deleteModalTitle">Excluir Ficha</h2>
-        <p>Tem certeza que deseja excluir esta ficha? Esta ação não poderá ser desfeita.</p>
+        <p id="deleteModalMessage">Tem certeza que deseja excluir esta ficha? Esta ação não poderá ser desfeita.</p>
         <div class="modal-actions">
           <button class="ghost-button" type="button" id="cancelDeleteBtn">CANCELAR</button>
           <button class="danger-button" type="button" id="confirmDeleteBtn">EXCLUIR</button>

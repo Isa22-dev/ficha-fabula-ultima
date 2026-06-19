@@ -695,6 +695,38 @@ label,
   color: #e9dcc2;
 }
 
+.selection-action-bar {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  z-index: 50;
+  width: min(760px, calc(100% - 32px));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(216, 181, 109, 0.48);
+  border-radius: 8px;
+  background: rgba(23, 16, 32, 0.92);
+  color: #e9dcc2;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3), 0 0 24px rgba(155, 93, 229, 0.2);
+  backdrop-filter: blur(16px);
+  transform: translateX(-50%);
+}
+
+.selection-action-bar div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.selection-action-bar strong {
+  color: #d8b56d;
+}
+
 .library-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 390px);
@@ -760,6 +792,52 @@ label,
 .arcane-book.selected {
   border-color: #d8b56d;
   box-shadow: 0 30px 62px rgba(0, 0, 0, 0.38), 0 0 34px rgba(216, 181, 109, 0.34);
+}
+
+.arcane-book.multi-selected {
+  border-color: #d8b56d;
+  background:
+    linear-gradient(90deg, rgba(216, 181, 109, 0.18) 0 12px, transparent 12px),
+    linear-gradient(145deg, rgba(35, 20, 48, 0.98), rgba(90, 43, 118, 0.88));
+  box-shadow: 0 28px 64px rgba(0, 0, 0, 0.38), 0 0 34px rgba(155, 93, 229, 0.42);
+}
+
+.arcane-book.multi-selected .book-rune {
+  border-color: #d8b56d;
+  color: #171020;
+  background: #d8b56d;
+}
+
+.book-select-toggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(216, 181, 109, 0.58);
+  border-radius: 8px;
+  color: #d8b56d;
+  background: rgba(10, 7, 16, 0.88);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+.arcane-book:hover .book-select-toggle,
+.arcane-book:focus-visible .book-select-toggle,
+.arcane-book.multi-selected .book-select-toggle {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.book-select-toggle:hover,
+.book-select-toggle[aria-pressed="true"] {
+  color: #171020;
+  background: #d8b56d;
 }
 
 .book-title,

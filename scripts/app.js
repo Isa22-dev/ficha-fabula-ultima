@@ -66,7 +66,9 @@ let pendingSave = false;
 let sheetList = [];
 let deleteModalOpen = false;
 let pendingDeleteId = null;
+let pendingDeleteIds = [];
 let selectedLibraryId = null;
+const selectedBookIds = new Set();
 let unsavedModalOpen = false;
 let drawerOpen = false;
 
@@ -307,6 +309,8 @@ function bindEvents() {
   $("#removePhotoBtn").addEventListener("click", removerFotoPerfil);
   $("#settingsTopBtn").addEventListener("click", abrirConfiguracoes);
   $("#backToLibraryBtn").addEventListener("click", voltarParaBiblioteca);
+  $("#deleteSelectedBooksBtn").addEventListener("click", abrirModalExclusaoSelecionadas);
+  $("#cancelBookSelectionBtn").addEventListener("click", limparSelecaoBiblioteca);
   $("#openFullSheetBtn").addEventListener("click", abrirFichaSelecionadaCompleta);
   $("#addMemory").addEventListener("click", addMemory);
   $("#addEquipment").addEventListener("click", addEquipment);
@@ -319,9 +323,16 @@ function bindEvents() {
     const attrRoll = event.target.closest("[data-roll-attribute]");
     const themeOption = event.target.closest("[data-theme-option]");
     const book = event.target.closest("[data-book-id]");
+    const bookSelect = event.target.closest("[data-select-book]");
     if (remove && state) removeItem(remove.dataset.remove, Number(remove.dataset.index));
     if (roll && state) rollDie(Number(roll.dataset.die));
     if (attrRoll && state) rolarAtributo(attrRoll.dataset.rollAttribute);
+    if (bookSelect) {
+      event.preventDefault();
+      event.stopPropagation();
+      alternarSelecaoLivro(bookSelect.dataset.selectBook);
+      return;
+    }
     if (book) abrirLivroFicha(book.dataset.bookId);
     if (themeOption) {
       setTheme(themeOption.dataset.themeOption);
@@ -329,6 +340,12 @@ function bindEvents() {
   });
 
   document.addEventListener("keydown", (event) => {
+    const book = event.target.closest?.("[data-book-id]");
+    if (book && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      abrirLivroFicha(book.dataset.bookId);
+      return;
+    }
     if (event.key === "Escape" && deleteModalOpen) {
       fecharModalExclusao(true);
       return;
@@ -375,6 +392,7 @@ function updateWorkspaceState() {
 function clearActiveSheet() {
   state = null;
   selectedLibraryId = null;
+  limparSelecaoBiblioteca(false);
   isDirty = false;
   pendingSave = false;
   clearTimeout(autosaveTimer);
@@ -667,6 +685,7 @@ async function carregarFicha(id) {
   if (error) return handleSupabaseError(error);
   state = fromRow(data);
   selectedLibraryId = state.id;
+  limparSelecaoBiblioteca(false);
   isDirty = false;
   hydrateForm();
   renderAll();
@@ -692,8 +711,27 @@ function abrirModalExclusao(id = state?.id) {
   const fichaId = String(id || "");
   if (!isUuid(fichaId)) return toast("Nenhuma ficha salva para excluir.", "danger");
   pendingDeleteId = fichaId;
+  pendingDeleteIds = [fichaId];
   deleteModalOpen = true;
   const modal = $("#deleteModal");
+  $("#deleteModalTitle").textContent = "Excluir Ficha";
+  $("#deleteModalMessage").textContent = "Tem certeza que deseja excluir esta ficha? Esta ação não poderá ser desfeita.";
+  $("#confirmDeleteBtn").textContent = "EXCLUIR";
+  modal.classList.remove("hidden", "closing");
+  $("#cancelDeleteBtn").focus();
+}
+
+function abrirModalExclusaoSelecionadas() {
+  const ids = [...selectedBookIds].filter(isUuid);
+  if (!ids.length) return toast("Selecione ao menos uma ficha para excluir.", "danger");
+  pendingDeleteId = null;
+  pendingDeleteIds = ids;
+  deleteModalOpen = true;
+  const modal = $("#deleteModal");
+  const count = ids.length;
+  $("#deleteModalTitle").textContent = "Excluir Fichas";
+  $("#deleteModalMessage").textContent = `Deseja realmente excluir ${count} ${count === 1 ? "ficha selecionada" : "fichas selecionadas"}? Esta ação não poderá ser desfeita.`;
+  $("#confirmDeleteBtn").textContent = "EXCLUIR";
   modal.classList.remove("hidden", "closing");
   $("#cancelDeleteBtn").focus();
 }
@@ -702,6 +740,7 @@ function fecharModalExclusao(showToast = false) {
   if (!deleteModalOpen) return;
   deleteModalOpen = false;
   pendingDeleteId = null;
+  pendingDeleteIds = [];
   const modal = $("#deleteModal");
   modal.classList.add("closing");
   setTimeout(() => {
@@ -712,9 +751,13 @@ function fecharModalExclusao(showToast = false) {
 }
 
 async function confirmarExclusao() {
-  const fichaId = pendingDeleteId;
+  const fichaIds = pendingDeleteIds.length ? [...pendingDeleteIds] : [pendingDeleteId].filter(Boolean);
   fecharModalExclusao(false);
-  await excluirFicha(fichaId);
+  if (fichaIds.length > 1) {
+    await excluirFichas(fichaIds);
+    return;
+  }
+  await excluirFicha(fichaIds[0]);
 }
 
 async function excluirFicha(id) {
@@ -733,6 +776,7 @@ async function excluirFicha(id) {
   if (error) return handleSupabaseError(error);
   if (!data?.id) return toast("Ficha não encontrada para exclusão.", "danger");
   sheetList = sheetList.filter((ficha) => ficha.id !== fichaId);
+  selectedBookIds.delete(fichaId);
   if (state?.id === fichaId) {
     state = null;
     selectedLibraryId = null;
@@ -741,6 +785,35 @@ async function excluirFicha(id) {
   await carregarBiblioteca();
   updateWorkspaceState();
   toast("Ficha excluída com sucesso.");
+}
+
+async function excluirFichas(ids) {
+  const fichaIds = [...new Set(ids.map(String).filter(isUuid))];
+  if (!user) return toast("Entre para excluir fichas.", "danger");
+  if (!fichaIds.length) return toast("Nenhuma ficha selecionada para excluir.", "danger");
+  setLoading(true);
+  const { data, error } = await db
+    .from("fichas_rpg")
+    .delete()
+    .in("id", fichaIds)
+    .eq("user_id", user.id)
+    .select("id");
+  setLoading(false);
+  if (error) return handleSupabaseError(error);
+  const deletedIds = new Set((data || []).map((item) => item.id));
+  if (!deletedIds.size) return toast("Nenhuma ficha selecionada foi encontrada.", "danger");
+  sheetList = sheetList.filter((ficha) => !deletedIds.has(ficha.id));
+  deletedIds.forEach((id) => selectedBookIds.delete(id));
+  if (state?.id && deletedIds.has(state.id)) {
+    state = null;
+    selectedLibraryId = null;
+    isDirty = false;
+  }
+  if (selectedLibraryId && deletedIds.has(selectedLibraryId)) selectedLibraryId = null;
+  atualizarBarraSelecaoBiblioteca();
+  await carregarBiblioteca();
+  updateWorkspaceState();
+  toast(`${deletedIds.size} ${deletedIds.size === 1 ? "ficha excluída" : "fichas excluídas"} com sucesso.`);
 }
 
 async function excluirFichaSupabase(id = state?.id) {
@@ -779,18 +852,24 @@ async function renderizarLivros(fichas) {
   const grid = $("#bookGrid");
   if (!grid) return;
   if (!fichas.length) {
+    limparSelecaoBiblioteca(false);
     mostrarEstadoVazio();
     preencherPainelLeitura(null);
     return;
   }
+  sincronizarSelecaoComBiblioteca(fichas);
   grid.innerHTML = fichas.map((ficha, index) => {
     const personagem = ficha.personagem || {};
     const nome = ficha.nome || personagem.identidade?.nome || "Ficha sem titulo";
     const classe = ficha.classe || personagem.identidade?.classe || "Classe indefinida";
     const nivel = ficha.nivel || personagem.identidade?.nivel || 1;
     const tema = ficha.tema || personagem.identidade?.tema || "Tema oculto";
+    const isChecked = selectedBookIds.has(ficha.id);
     return `
-      <button class="arcane-book ${selectedLibraryId === ficha.id ? "selected" : ""}" type="button" data-book-id="${ficha.id}" style="animation-delay:${Math.min(index * 45, 360)}ms">
+      <article class="arcane-book ${selectedLibraryId === ficha.id ? "selected" : ""} ${isChecked ? "multi-selected" : ""}" role="button" tabindex="0" data-book-id="${ficha.id}" style="animation-delay:${Math.min(index * 45, 360)}ms" aria-label="Selecionar ficha ${escapeHtml(nome)}">
+        <button class="book-select-toggle" type="button" data-select-book="${ficha.id}" aria-label="Selecionar ${escapeHtml(nome)}" aria-pressed="${isChecked}">
+          <i class="ti ${isChecked ? "ti-check" : "ti-square"}"></i>
+        </button>
         <span class="book-rune"><i class="ti ti-book-2"></i></span>
         <span class="book-title">
           <strong>${escapeHtml(nome)}</strong>
@@ -800,12 +879,13 @@ async function renderizarLivros(fichas) {
           <span>Nv. ${escapeHtml(nivel)}</span>
           <span>${escapeHtml(tema)}</span>
         </span>
-      </button>
+      </article>
     `;
   }).join("");
   const selected = sheetList.find((ficha) => ficha.id === selectedLibraryId) || sheetList[0];
   if (!selectedLibraryId && selected) selectedLibraryId = selected.id;
   preencherPainelLeitura(selected);
+  atualizarBarraSelecaoBiblioteca();
 }
 
 async function abrirLivroFicha(id) {
@@ -813,6 +893,37 @@ async function abrirLivroFicha(id) {
   const ficha = sheetList.find((item) => item.id === id);
   preencherPainelLeitura(ficha || null);
   renderizarLivros(sheetList);
+}
+
+function alternarSelecaoLivro(id) {
+  if (!isUuid(id)) return;
+  if (selectedBookIds.has(id)) {
+    selectedBookIds.delete(id);
+  } else {
+    selectedBookIds.add(id);
+  }
+  renderizarLivros(sheetList);
+}
+
+function sincronizarSelecaoComBiblioteca(fichas) {
+  const validIds = new Set(fichas.map((ficha) => ficha.id));
+  [...selectedBookIds].forEach((id) => {
+    if (!validIds.has(id)) selectedBookIds.delete(id);
+  });
+}
+
+function limparSelecaoBiblioteca(render = true) {
+  selectedBookIds.clear();
+  atualizarBarraSelecaoBiblioteca();
+  if (render) renderizarLivros(sheetList);
+}
+
+function atualizarBarraSelecaoBiblioteca() {
+  const bar = $("#selectionActionBar");
+  const count = selectedBookIds.size;
+  if (!bar) return;
+  bar.classList.toggle("hidden", count === 0);
+  $("#selectionCount").textContent = `${count} ${count === 1 ? "ficha selecionada" : "fichas selecionadas"}`;
 }
 
 function criarNovoLivro() {
@@ -891,6 +1002,7 @@ async function retornarParaBiblioteca() {
   await wait(260);
   state = null;
   isDirty = false;
+  limparSelecaoBiblioteca(false);
   clearTimeout(autosaveTimer);
   await carregarBiblioteca();
   $$(".nav-tab").forEach((item) => item.classList.toggle("active", item.id === "libraryNavBtn"));
@@ -1011,6 +1123,7 @@ function novaFicha() {
     toast("Entre para criar uma nova ficha.", "danger");
     return;
   }
+  limparSelecaoBiblioteca(false);
   state = defaultSheet();
   selectedLibraryId = null;
   isDirty = false;
