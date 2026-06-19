@@ -1,5 +1,4 @@
-const supabase = window.supabaseClient;
-const db = supabase;
+const db = window.supabaseClient;
 const backupKey = "ficha-fabula-ultima-backup";
 const themeKey = "ficha-fabula-ultima-theme";
 
@@ -811,7 +810,7 @@ async function excluirFicha(id) {
   setLoading(true);
 
   try {
-    const { error } = await supabase
+    const { error } = await db
       .from("fichas_rpg")
       .delete()
       .eq("id", fichaId);
@@ -860,7 +859,7 @@ async function excluirFichasSelecionadas(ids) {
   setLoading(true);
 
   try {
-    const { error } = await supabase
+    const { error } = await db
       .from("fichas_rpg")
       .delete()
       .in("id", fichaIds);
@@ -913,7 +912,7 @@ async function fichasExistemNoSupabase(ids) {
   const fichaIds = [...new Set(ids.map(String).filter(isUuid))];
   if (!fichaIds.length) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("fichas_rpg")
     .select("id")
     .in("id", fichaIds);
