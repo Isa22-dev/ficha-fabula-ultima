@@ -68,6 +68,8 @@ let deleteModalOpen = false;
 let pendingDeleteId = null;
 let pendingDeleteIds = [];
 let selectedLibraryId = null;
+let fichaSelecionada = null;
+let fichaParaExcluirId = null;
 const selectedBookIds = new Set();
 let unsavedModalOpen = false;
 let drawerOpen = false;
@@ -749,10 +751,23 @@ async function atualizarFichaSupabase(id = state?.id) {
 }
 
 function abrirModalExclusao(id = state?.id) {
-  const fichaId = String(id || "");
-  if (!isUuid(fichaId)) return toast("Nenhuma ficha salva para excluir.", "danger");
+  const fichaId = String(id || fichaSelecionada?.id || "");
+  const ficha = sheetList.find((item) => item.id === fichaId) || fichaSelecionada || (state?.id === fichaId ? { ...state, id: fichaId } : null);
+
+  console.log("Ficha selecionada:", ficha);
+  console.log("ID da ficha selecionada:", ficha?.id);
+  console.log("IDs selecionados:", [...selectedBookIds]);
+  console.log("Usuário logado:", user?.id);
+
+  if (!ficha || !ficha.id || !isUuid(fichaId)) {
+    mostrarToast("Nenhuma ficha válida selecionada.");
+    console.error("Nenhuma ficha selecionada ou ID ausente.", ficha);
+    return;
+  }
+
   pendingDeleteId = fichaId;
   pendingDeleteIds = [fichaId];
+  fichaParaExcluirId = fichaId;
   deleteModalOpen = true;
   const modal = $("#deleteModal");
   $("#deleteModalTitle").textContent = "Excluir Ficha";
@@ -764,9 +779,21 @@ function abrirModalExclusao(id = state?.id) {
 
 function abrirModalExclusaoSelecionadas() {
   const ids = [...selectedBookIds].filter(isUuid);
-  if (!ids.length) return toast("Selecione ao menos uma ficha para excluir.", "danger");
+
+  console.log("Ficha selecionada:", fichaSelecionada);
+  console.log("ID da ficha selecionada:", fichaSelecionada?.id);
+  console.log("IDs selecionados:", ids);
+  console.log("Usuário logado:", user?.id);
+
+  if (!ids.length) return mostrarToast("Nenhuma ficha selecionada.");
+  if (ids.length === 1) {
+    abrirModalExclusao(ids[0]);
+    return;
+  }
+
   pendingDeleteId = null;
   pendingDeleteIds = ids;
+  fichaParaExcluirId = null;
   deleteModalOpen = true;
   const modal = $("#deleteModal");
   const count = ids.length;
@@ -782,6 +809,7 @@ function fecharModalExclusao(showToast = false) {
   deleteModalOpen = false;
   pendingDeleteId = null;
   pendingDeleteIds = [];
+  fichaParaExcluirId = null;
   const modal = $("#deleteModal");
   modal.classList.add("closing");
   setTimeout(() => {
@@ -793,44 +821,70 @@ function fecharModalExclusao(showToast = false) {
 
 async function confirmarExclusao() {
   const fichaIds = pendingDeleteIds.length ? [...pendingDeleteIds] : [pendingDeleteId].filter(Boolean);
-  fecharModalExclusao(false);
   if (fichaIds.length > 1) {
+    fecharModalExclusao(false);
     await excluirFichasSelecionadas(fichaIds);
     return;
   }
-  await excluirFicha(fichaIds[0]);
+  await confirmarExclusaoFicha(fichaIds[0]);
 }
 
-async function excluirFicha(id) {
-  const fichaId = String(id || "");
-  if (!user) return mostrarToast("Erro ao excluir ficha.");
-  if (!isUuid(fichaId)) return mostrarToast("Erro ao excluir ficha.");
+async function confirmarExclusaoFicha(id = fichaParaExcluirId) {
+  const fichaId = String(id || fichaParaExcluirId || "");
+
+  if (!fichaId) {
+    mostrarToast("Nenhuma ficha selecionada para excluir.");
+    console.error("fichaParaExcluirId ausente.");
+    return;
+  }
+
+  if (!isUuid(fichaId)) {
+    mostrarToast("ID da ficha não encontrado.");
+    console.error("ID inválido para exclusão:", fichaId);
+    return;
+  }
 
   console.log("Excluindo ficha:", fichaId);
+  console.log("Excluindo ficha ID:", fichaId);
   setLoading(true);
 
   try {
-    const { error } = await db
-      .from("fichas_rpg")
-      .delete()
-      .eq("id", fichaId);
+    const { data: userData, error: userError } = await db.auth.getUser();
 
-    console.log("Resposta Supabase:", error);
-
-    if (error) {
-      console.error(error);
-      mostrarToast("Erro ao excluir ficha.");
+    if (userError || !userData?.user) {
+      console.error("Erro ao obter usuário:", userError);
+      mostrarToast("Usuário não autenticado.");
       return;
     }
 
-    const stillExists = await fichaExisteNoSupabase(fichaId);
-    if (stillExists) {
-      console.error("Registro ainda existe no Supabase após delete:", fichaId);
-      mostrarToast("Erro ao excluir ficha.");
+    const userId = userData.user.id;
+
+    const { data, error } = await db
+      .from("fichas_rpg")
+      .delete()
+      .eq("id", fichaId)
+      .eq("user_id", userId)
+      .select();
+
+    console.log("Resposta delete:", data);
+    console.log("Erro delete:", error);
+    console.log("Resposta Supabase:", error);
+
+    if (error) {
+      console.error("Erro Supabase ao excluir:", error);
+      mostrarToast(error.message || "Erro ao excluir ficha.");
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      mostrarToast("Nenhuma ficha foi excluída. Verifique permissões ou ID.");
+      console.warn("Delete executado, mas nenhum registro removido.");
       return;
     }
 
     selectedBookIds.delete(fichaId);
+    fichaSelecionada = null;
+    fichaParaExcluirId = null;
     if (state?.id === fichaId) {
       state = null;
       selectedLibraryId = null;
@@ -840,46 +894,70 @@ async function excluirFicha(id) {
     atualizarBarraSelecaoBiblioteca();
 
     mostrarToast("Ficha excluída com sucesso.");
+    fecharModalExclusao(false);
     await carregarBiblioteca();
     updateWorkspaceState();
   } catch (err) {
-    console.error(err);
-    mostrarToast("Erro ao excluir ficha.");
+    console.error("Erro inesperado ao excluir ficha:", err);
+    mostrarToast("Erro inesperado ao excluir ficha.");
   } finally {
     setLoading(false);
   }
 }
 
-async function excluirFichasSelecionadas(ids) {
+async function excluirFicha(id) {
+  fichaParaExcluirId = id;
+  return confirmarExclusaoFicha(id);
+}
+
+async function excluirFichasSelecionadas(ids = [...selectedBookIds]) {
   const fichaIds = [...new Set(ids.map(String).filter(isUuid))];
-  if (!user) return mostrarToast("Erro ao excluir fichas.");
-  if (!fichaIds.length) return mostrarToast("Erro ao excluir fichas.");
+  if (!fichaIds.length) {
+    mostrarToast("Nenhuma ficha selecionada.");
+    return;
+  }
 
   console.log("IDs selecionados:", fichaIds);
   setLoading(true);
 
   try {
-    const { error } = await db
+    const { data: userData, error: userError } = await db.auth.getUser();
+
+    if (userError || !userData?.user) {
+      console.error("Erro ao obter usuário:", userError);
+      mostrarToast("Usuário não autenticado.");
+      return;
+    }
+
+    const userId = userData.user.id;
+
+    console.log("Excluindo IDs:", fichaIds);
+
+    const { data, error } = await db
       .from("fichas_rpg")
       .delete()
-      .in("id", fichaIds);
+      .in("id", fichaIds)
+      .eq("user_id", userId)
+      .select();
 
+    console.log("Resposta delete múltiplo:", data);
+    console.log("Erro delete múltiplo:", error);
     console.log("Resposta Supabase:", error);
 
     if (error) {
       console.error(error);
-      mostrarToast("Erro ao excluir fichas.");
+      mostrarToast(error.message || "Erro ao excluir fichas.");
       return;
     }
 
-    const remainingIds = await fichasExistemNoSupabase(fichaIds);
-    if (remainingIds.length) {
-      console.error("Registros ainda existem no Supabase após delete:", remainingIds);
-      mostrarToast("Erro ao excluir fichas.");
+    if (!data || data.length === 0) {
+      mostrarToast("Nenhuma ficha foi excluída.");
+      console.warn("Delete múltiplo executado, mas nenhum registro removido.");
       return;
     }
 
     fichaIds.forEach((fichaId) => selectedBookIds.delete(fichaId));
+    fichaSelecionada = null;
     if (state?.id && fichaIds.includes(state.id)) {
       state = null;
       selectedLibraryId = null;
@@ -888,12 +966,12 @@ async function excluirFichasSelecionadas(ids) {
     if (selectedLibraryId && fichaIds.includes(selectedLibraryId)) selectedLibraryId = null;
     atualizarBarraSelecaoBiblioteca();
 
-    mostrarToast(`${fichaIds.length} fichas excluídas com sucesso.`);
+    mostrarToast(`${data.length} ficha(s) excluída(s) com sucesso.`);
     await carregarBiblioteca();
     updateWorkspaceState();
   } catch (err) {
     console.error(err);
-    mostrarToast("Erro ao excluir fichas.");
+    mostrarToast("Erro inesperado ao excluir fichas.");
   } finally {
     setLoading(false);
   }
@@ -975,7 +1053,7 @@ async function renderizarLivros(fichas) {
     const tema = ficha.tema || personagem.identidade?.tema || "Tema oculto";
     const isChecked = selectedBookIds.has(ficha.id);
     return `
-      <article class="arcane-book ${selectedLibraryId === ficha.id ? "selected" : ""} ${isChecked ? "multi-selected" : ""}" role="button" tabindex="0" data-book-id="${ficha.id}" style="animation-delay:${Math.min(index * 45, 360)}ms" aria-label="Selecionar ficha ${escapeHtml(nome)}">
+      <article class="arcane-book ${selectedLibraryId === ficha.id ? "selected" : ""} ${isChecked ? "multi-selected" : ""}" role="button" tabindex="0" data-book-id="${ficha.id}" data-id="${ficha.id}" style="animation-delay:${Math.min(index * 45, 360)}ms" aria-label="Selecionar ficha ${escapeHtml(nome)}">
         <button class="book-select-toggle" type="button" data-select-book="${ficha.id}" aria-label="Selecionar ${escapeHtml(nome)}" aria-pressed="${isChecked}">
           <i class="ti ${isChecked ? "ti-check" : "ti-square"}"></i>
         </button>
@@ -993,6 +1071,7 @@ async function renderizarLivros(fichas) {
   }).join("");
   const selected = sheetList.find((ficha) => ficha.id === selectedLibraryId) || sheetList[0];
   if (!selectedLibraryId && selected) selectedLibraryId = selected.id;
+  fichaSelecionada = selected || null;
   preencherPainelLeitura(selected);
   atualizarBarraSelecaoBiblioteca();
 }
@@ -1000,12 +1079,21 @@ async function renderizarLivros(fichas) {
 async function abrirLivroFicha(id) {
   selectedLibraryId = id;
   const ficha = sheetList.find((item) => item.id === id);
-  preencherPainelLeitura(ficha || null);
+  selecionarFicha(ficha || null);
   renderizarLivros(sheetList);
+}
+
+function selecionarFicha(ficha) {
+  fichaSelecionada = ficha;
+  selectedLibraryId = ficha?.id || null;
+  console.log("Ficha selecionada:", fichaSelecionada);
+  preencherPainelLeitura(ficha || null);
 }
 
 function alternarSelecaoLivro(id) {
   if (!isUuid(id)) return;
+  const ficha = sheetList.find((item) => item.id === id) || null;
+  if (ficha) selecionarFicha(ficha);
   if (selectedBookIds.has(id)) {
     selectedBookIds.delete(id);
   } else {
@@ -1023,6 +1111,7 @@ function sincronizarSelecaoComBiblioteca(fichas) {
 
 function limparSelecaoBiblioteca(render = true) {
   selectedBookIds.clear();
+  fichaSelecionada = null;
   atualizarBarraSelecaoBiblioteca();
   if (render) renderizarLivros(sheetList);
 }
