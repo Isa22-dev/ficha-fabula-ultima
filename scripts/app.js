@@ -1,4 +1,5 @@
-const db = window.supabaseClient;
+const supabase = window.supabaseClient;
+const db = supabase;
 const backupKey = "ficha-fabula-ultima-backup";
 const themeKey = "ficha-fabula-ultima-theme";
 
@@ -754,7 +755,7 @@ async function confirmarExclusao() {
   const fichaIds = pendingDeleteIds.length ? [...pendingDeleteIds] : [pendingDeleteId].filter(Boolean);
   fecharModalExclusao(false);
   if (fichaIds.length > 1) {
-    await excluirFichas(fichaIds);
+    await excluirFichasSelecionadas(fichaIds);
     return;
   }
   await excluirFicha(fichaIds[0]);
@@ -762,58 +763,126 @@ async function confirmarExclusao() {
 
 async function excluirFicha(id) {
   const fichaId = String(id || "");
-  if (!user) return toast("Entre para excluir fichas.", "danger");
-  if (!isUuid(fichaId)) return toast("Nenhuma ficha salva para excluir.", "danger");
+  if (!user) return mostrarToast("Erro ao excluir ficha.");
+  if (!isUuid(fichaId)) return mostrarToast("Erro ao excluir ficha.");
+
+  console.log("Excluindo ficha:", fichaId);
   setLoading(true);
-  const { data, error } = await db
-    .from("fichas_rpg")
-    .delete()
-    .eq("id", fichaId)
-    .eq("user_id", user.id)
-    .select("id")
-    .maybeSingle();
-  setLoading(false);
-  if (error) return handleSupabaseError(error);
-  if (!data?.id) return toast("Ficha não encontrada para exclusão.", "danger");
-  sheetList = sheetList.filter((ficha) => ficha.id !== fichaId);
-  selectedBookIds.delete(fichaId);
-  if (state?.id === fichaId) {
-    state = null;
-    selectedLibraryId = null;
-    isDirty = false;
+
+  try {
+    const { error } = await supabase
+      .from("fichas_rpg")
+      .delete()
+      .eq("id", fichaId);
+
+    console.log("Resposta Supabase:", error);
+
+    if (error) {
+      console.error(error);
+      mostrarToast("Erro ao excluir ficha.");
+      return;
+    }
+
+    const stillExists = await fichaExisteNoSupabase(fichaId);
+    if (stillExists) {
+      console.error("Registro ainda existe no Supabase após delete:", fichaId);
+      mostrarToast("Erro ao excluir ficha.");
+      return;
+    }
+
+    selectedBookIds.delete(fichaId);
+    if (state?.id === fichaId) {
+      state = null;
+      selectedLibraryId = null;
+      isDirty = false;
+    }
+    if (selectedLibraryId === fichaId) selectedLibraryId = null;
+    atualizarBarraSelecaoBiblioteca();
+
+    mostrarToast("Ficha excluída com sucesso.");
+    await carregarBiblioteca();
+    updateWorkspaceState();
+  } catch (err) {
+    console.error(err);
+    mostrarToast("Erro ao excluir ficha.");
+  } finally {
+    setLoading(false);
   }
-  await carregarBiblioteca();
-  updateWorkspaceState();
-  toast("Ficha excluída com sucesso.");
+}
+
+async function excluirFichasSelecionadas(ids) {
+  const fichaIds = [...new Set(ids.map(String).filter(isUuid))];
+  if (!user) return mostrarToast("Erro ao excluir fichas.");
+  if (!fichaIds.length) return mostrarToast("Erro ao excluir fichas.");
+
+  console.log("IDs selecionados:", fichaIds);
+  setLoading(true);
+
+  try {
+    const { error } = await supabase
+      .from("fichas_rpg")
+      .delete()
+      .in("id", fichaIds);
+
+    console.log("Resposta Supabase:", error);
+
+    if (error) {
+      console.error(error);
+      mostrarToast("Erro ao excluir fichas.");
+      return;
+    }
+
+    const remainingIds = await fichasExistemNoSupabase(fichaIds);
+    if (remainingIds.length) {
+      console.error("Registros ainda existem no Supabase após delete:", remainingIds);
+      mostrarToast("Erro ao excluir fichas.");
+      return;
+    }
+
+    fichaIds.forEach((fichaId) => selectedBookIds.delete(fichaId));
+    if (state?.id && fichaIds.includes(state.id)) {
+      state = null;
+      selectedLibraryId = null;
+      isDirty = false;
+    }
+    if (selectedLibraryId && fichaIds.includes(selectedLibraryId)) selectedLibraryId = null;
+    atualizarBarraSelecaoBiblioteca();
+
+    mostrarToast(`${fichaIds.length} fichas excluídas com sucesso.`);
+    await carregarBiblioteca();
+    updateWorkspaceState();
+  } catch (err) {
+    console.error(err);
+    mostrarToast("Erro ao excluir fichas.");
+  } finally {
+    setLoading(false);
+  }
 }
 
 async function excluirFichas(ids) {
+  return excluirFichasSelecionadas(ids);
+}
+
+async function fichaExisteNoSupabase(id) {
+  const remainingIds = await fichasExistemNoSupabase([id]);
+  return remainingIds.includes(id);
+}
+
+async function fichasExistemNoSupabase(ids) {
   const fichaIds = [...new Set(ids.map(String).filter(isUuid))];
-  if (!user) return toast("Entre para excluir fichas.", "danger");
-  if (!fichaIds.length) return toast("Nenhuma ficha selecionada para excluir.", "danger");
-  setLoading(true);
-  const { data, error } = await db
+  if (!fichaIds.length) return [];
+
+  const { data, error } = await supabase
     .from("fichas_rpg")
-    .delete()
-    .in("id", fichaIds)
-    .eq("user_id", user.id)
-    .select("id");
-  setLoading(false);
-  if (error) return handleSupabaseError(error);
-  const deletedIds = new Set((data || []).map((item) => item.id));
-  if (!deletedIds.size) return toast("Nenhuma ficha selecionada foi encontrada.", "danger");
-  sheetList = sheetList.filter((ficha) => !deletedIds.has(ficha.id));
-  deletedIds.forEach((id) => selectedBookIds.delete(id));
-  if (state?.id && deletedIds.has(state.id)) {
-    state = null;
-    selectedLibraryId = null;
-    isDirty = false;
+    .select("id")
+    .in("id", fichaIds);
+
+  if (error) {
+    console.error(error);
+    throw error;
   }
-  if (selectedLibraryId && deletedIds.has(selectedLibraryId)) selectedLibraryId = null;
-  atualizarBarraSelecaoBiblioteca();
-  await carregarBiblioteca();
-  updateWorkspaceState();
-  toast(`${deletedIds.size} ${deletedIds.size === 1 ? "ficha excluída" : "fichas excluídas"} com sucesso.`);
+
+  return (data || []).map((item) => item.id);
 }
 
 async function excluirFichaSupabase(id = state?.id) {
