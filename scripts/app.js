@@ -79,14 +79,22 @@ const $$ = (selector) => [...document.querySelectorAll(selector)];
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
+  if (!db?.auth) {
+    console.error("Supabase Auth não inicializado.", window.supabaseClient);
+    toast("Erro ao inicializar autenticação.", "danger");
+    return;
+  }
+
   bindNavigation();
   renderStaticControls();
   bindEvents();
   applySavedTheme();
   setLoading(true);
   const { data } = await db.auth.getSession();
+  console.log("Sessão inicial Supabase:", data);
   user = data.session?.user || null;
   db.auth.onAuthStateChange((_event, session) => {
+    console.log("Auth state change:", _event, session);
     user = session?.user || null;
     refreshAuthState();
   });
@@ -280,6 +288,7 @@ function bindEvents() {
 
   $("#authForm").addEventListener("submit", async (event) => {
     event.preventDefault();
+    console.log("Formulário de login enviado.");
     await login();
   });
   $("#signupBtn").addEventListener("click", signup);
@@ -528,19 +537,51 @@ function removeItem(list, index) {
 }
 
 async function login() {
-  const loginId = getAuthLoginId();
+  const loginValue = $("#authLogin").value.trim();
+  const password = $("#authPassword").value;
+
+  console.log("Login informado:", loginValue);
+  console.log("Senha informada:", password);
+
+  const loginId = getAuthLoginId(loginValue);
   if (!loginId) return;
+
+  console.log("Email utilizado:", loginId.email);
+
   try {
     setLoading(true);
     const { error, data } = await db.auth.signInWithPassword({
       email: loginId.email,
-      password: $("#authPassword").value
+      password
     });
-    if (error) return toast(authErrorMessage(error), "danger");
-    user = data.user;
+
+    console.log("Resposta Supabase:", data);
+    console.log("Erro Supabase:", error);
+
+    if (error) {
+      console.error("Erro Supabase:", error);
+      return toast(authErrorMessage(error), "danger");
+    }
+
+    user = data.user || data.session?.user || null;
+
+    if (!user) {
+      const { data: sessionData, error: sessionError } = await db.auth.getSession();
+      console.log("Sessão após login:", sessionData);
+      console.log("Erro ao obter sessão após login:", sessionError);
+      if (sessionError) console.error("Erro ao obter sessão após login:", sessionError);
+      user = sessionData.session?.user || null;
+    }
+
+    if (!user) {
+      console.error("Login retornou sem usuário e sem sessão ativa.", data);
+      return toast("Login realizado, mas a sessão não foi encontrada.", "danger");
+    }
+
     await refreshAuthState();
     toast("Login realizado.");
   } catch (error) {
+    console.error("Erro inesperado no login:", error);
     toast(authErrorMessage(error), "danger");
   } finally {
     setLoading(false);
@@ -1570,9 +1611,13 @@ function toast(message, type = "success") {
   }, 3600);
 }
 
-function getAuthLoginId() {
-  const value = $("#authLogin").value.trim().toLowerCase();
+function getAuthLoginId(rawValue = $("#authLogin").value) {
+  const value = String(rawValue || "").trim().toLowerCase();
+
+  console.log("Login normalizado:", value);
+
   if (isEmail(value)) {
+    console.log("Tipo de login detectado:", "email");
     return {
       email: value,
       type: "email",
@@ -1580,11 +1625,15 @@ function getAuthLoginId() {
     };
   }
   if (!/^[a-z0-9._-]{3,32}$/.test(value)) {
+    console.error("Login inválido para username/email:", value);
     toast("Use um username com 3 a 32 caracteres ou um email valido.", "danger");
     return null;
   }
+  const email = usernameToAuthEmail(value);
+  console.log("Tipo de login detectado:", "username");
+  console.log("Username convertido em email:", email);
   return {
-    email: usernameToAuthEmail(value),
+    email,
     type: "username",
     username: value
   };
@@ -1599,7 +1648,9 @@ function isUuid(value) {
 }
 
 function usernameToAuthEmail(username) {
-  return `${username}@ficha-fabula.local`;
+  const email = `${username}@ficha-fabula.local`;
+  console.log("Email final do username:", email);
+  return email;
 }
 
 function handleSupabaseError(error, showToast = true) {
