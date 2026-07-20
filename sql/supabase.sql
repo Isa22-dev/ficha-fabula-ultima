@@ -30,6 +30,101 @@ begin
 end;
 $$;
 
+create or replace function public.is_admin_user()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+select
+  coalesce((auth.jwt() -> 'app_metadata' ->> 'is_admin')::boolean, false)
+  or coalesce((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin', false)
+  or coalesce((auth.jwt() -> 'user_metadata' ->> 'is_admin')::boolean, false)
+  or coalesce((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin', false);
+$$;
+
+create or replace function public.get_ficha_visivel(p_ficha_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ficha public.fichas_rpg;
+  v_user_id uuid := auth.uid();
+  v_is_admin boolean := public.is_admin_user();
+begin
+  select * into v_ficha from public.fichas_rpg where id = p_ficha_id;
+
+  if not found then
+    return null;
+  end if;
+
+  if v_user_id = v_ficha.user_id or v_is_admin then
+    return to_jsonb(v_ficha);
+  end if;
+
+  return jsonb_build_object(
+    'id', v_ficha.id,
+    'user_id', v_ficha.user_id,
+    'nome', v_ficha.nome,
+    'retrato', v_ficha.retrato,
+    'personagem', jsonb_build_object(
+      'identidade', jsonb_build_object('nome', v_ficha.nome),
+      'recursos', coalesce(v_ficha.personagem->'recursos', '{}'::jsonb)
+    )
+  );
+end;
+$$;
+
+create or replace function public.listar_fichas_visiveis()
+returns table (
+  id uuid,
+  user_id uuid,
+  nome text,
+  classe text,
+  nivel integer,
+  tema text,
+  origem text,
+  retrato text,
+  personagem jsonb,
+  updated_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_is_admin boolean := public.is_admin_user();
+begin
+  return query
+  select
+    f.id,
+    f.user_id,
+    f.nome,
+    case when v_user_id = f.user_id or v_is_admin then f.classe else null end as classe,
+    case when v_user_id = f.user_id or v_is_admin then f.nivel else null end as nivel,
+    case when v_user_id = f.user_id or v_is_admin then f.tema else null end as tema,
+    case when v_user_id = f.user_id or v_is_admin then f.origem else null end as origem,
+    case when v_user_id = f.user_id or v_is_admin then f.retrato else null end as retrato,
+    case
+      when v_user_id = f.user_id or v_is_admin then f.personagem
+      else jsonb_build_object(
+        'identidade', jsonb_build_object('nome', f.nome),
+        'recursos', coalesce(f.personagem->'recursos', '{}'::jsonb)
+      )
+    end as personagem,
+    f.updated_at
+  from public.fichas_rpg f
+  order by f.updated_at desc;
+end;
+$$;
+
+grant execute on function public.is_admin_user() to authenticated;
+grant execute on function public.get_ficha_visivel(uuid) to authenticated;
+grant execute on function public.listar_fichas_visiveis() to authenticated;
+
 drop trigger if exists set_fichas_rpg_updated_at on public.fichas_rpg;
 
 create trigger set_fichas_rpg_updated_at
@@ -40,15 +135,24 @@ execute function public.set_updated_at();
 alter table public.fichas_rpg enable row level security;
 
 drop policy if exists "select_own_fichas_rpg" on public.fichas_rpg;
+drop policy if exists "select_admin_fichas_rpg" on public.fichas_rpg;
 drop policy if exists "insert_own_fichas_rpg" on public.fichas_rpg;
 drop policy if exists "update_own_fichas_rpg" on public.fichas_rpg;
+drop policy if exists "update_admin_fichas_rpg" on public.fichas_rpg;
 drop policy if exists "delete_own_fichas_rpg" on public.fichas_rpg;
+drop policy if exists "delete_admin_fichas_rpg" on public.fichas_rpg;
 
 create policy "select_own_fichas_rpg"
 on public.fichas_rpg
 for select
 to authenticated
 using (auth.uid() = user_id);
+
+create policy "select_admin_fichas_rpg"
+on public.fichas_rpg
+for select
+to authenticated
+using (public.is_admin_user());
 
 create policy "insert_own_fichas_rpg"
 on public.fichas_rpg
@@ -63,11 +167,24 @@ to authenticated
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
+create policy "update_admin_fichas_rpg"
+on public.fichas_rpg
+for update
+to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
+
 create policy "delete_own_fichas_rpg"
 on public.fichas_rpg
 for delete
 to authenticated
 using (auth.uid() = user_id);
+
+create policy "delete_admin_fichas_rpg"
+on public.fichas_rpg
+for delete
+to authenticated
+using (public.is_admin_user());
 
 -- Tabela de Anotações de Sessão
 create table if not exists public.anotacoes_sessao (

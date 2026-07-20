@@ -73,6 +73,7 @@ let fichaParaExcluirId = null;
 const selectedBookIds = new Set();
 let unsavedModalOpen = false;
 let drawerOpen = false;
+let permissionMode = "full";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -386,22 +387,58 @@ function updateWorkspaceState() {
   const hasSheet = Boolean(state);
   const libraryVisible = hasUser && !hasSheet;
   const editorVisible = hasUser && hasSheet;
+  const isPublicView = permissionMode === "public";
   $("#library-screen").classList.toggle("hidden", editorVisible);
   $("#sheet-editor-screen").classList.toggle("hidden", !editorVisible);
   $("#arcaneLibrary").classList.toggle("hidden", !libraryVisible);
   if (libraryVisible) $$(".nav-tab").forEach((item) => item.classList.toggle("active", item.id === "libraryNavBtn"));
-  $("#sheetForm").classList.toggle("hidden", !editorVisible);
+  $("#sheetForm").classList.toggle("hidden", !editorVisible || isPublicView);
+  $("#publicSheetView").classList.toggle("hidden", !editorVisible || !isPublicView);
   $("#emptyState").classList.add("hidden");
   $("#backToLibraryBtn").classList.toggle("hidden", !editorVisible);
-  $("#saveBtnTop").disabled = !editorVisible;
+  $("#saveBtnTop").disabled = !editorVisible || isPublicView;
   $("#newSheetBtn").disabled = !hasUser;
-  $("#deleteBtn").disabled = !editorVisible || !state?.id;
-  $("#exportBtn").disabled = !hasSheet;
-  $("#resetBtn").disabled = !hasSheet;
+  $("#deleteBtn").disabled = !editorVisible || !state?.id || isPublicView;
+  $("#exportBtn").disabled = !hasSheet || isPublicView;
+  $("#resetBtn").disabled = !hasSheet || isPublicView;
+}
+
+function isAdminUser() {
+  const role = user?.app_metadata?.role || user?.user_metadata?.role;
+  const isAdminFlag = user?.app_metadata?.is_admin ?? user?.user_metadata?.is_admin;
+  return role === "admin" || isAdminFlag === true;
+}
+
+function canAccessCompleteSheet(ficha = state) {
+  if (!user) return false;
+  if (isAdminUser()) return true;
+  if (!ficha?.id && !ficha?.user_id) return true;
+  return Boolean(ficha?.user_id && ficha.user_id === user.id);
+}
+
+function applyPermissionView(ficha = state) {
+  permissionMode = canAccessCompleteSheet(ficha) ? "full" : "public";
+  const notice = $("#permissionNotice");
+  const publicView = $("#publicSheetView");
+  const form = $("#sheetForm");
+  const isPublicView = permissionMode === "public";
+  if (notice) {
+    notice.classList.toggle("hidden", !isPublicView);
+    notice.innerHTML = isPublicView
+      ? '<div class="permission-banner-body"><strong>Modo público ativo.</strong><p>Você está visualizando a ficha de outro jogador. Apenas informações públicas estão disponíveis.</p></div>'
+      : "";
+  }
+  if (publicView) publicView.classList.toggle("hidden", !isPublicView);
+  if (form) form.classList.toggle("hidden", !state || isPublicView);
+  updateWorkspaceState();
+  if (permissionMode === "public") {
+    renderPublicView();
+  }
 }
 
 function clearActiveSheet() {
   state = null;
+  permissionMode = "full";
   selectedLibraryId = null;
   limparSelecaoBiblioteca(false);
   isDirty = false;
@@ -432,6 +469,7 @@ function renderAll() {
     updateWorkspaceState();
     return;
   }
+  applyPermissionView(state);
   renderResources();
   renderMemories();
   renderEquipment();
@@ -439,7 +477,6 @@ function renderAll() {
   renderRollHistory();
   renderProfilePhoto();
   renderPreview();
-  updateWorkspaceState();
 }
 
 function renderAttributeRollPlaceholder(attr) {
@@ -663,6 +700,10 @@ async function salvarFicha(options = {}) {
     if (!silent) toast("Clique em Nova Ficha para começar.", "danger");
     return;
   }
+  if (permissionMode === "public") {
+    if (!silent) toast("Você não pode editar uma ficha de outro jogador.", "danger");
+    return;
+  }
   if (!user) {
     if (!silent) toast("Entre para salvar online.", "danger");
     return;
@@ -723,17 +764,20 @@ async function encontrarFichaExistente() {
 async function carregarFicha(id) {
   if (!id) return;
   setLoading(true);
-  const { data, error } = await db.from("fichas_rpg").select("*").eq("id", id).single();
+  const { data, error } = await db.rpc("get_ficha_visivel", { p_ficha_id: id });
   setLoading(false);
   if (error) return handleSupabaseError(error);
-  state = fromRow(data);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return toast("Ficha não encontrada.", "danger");
+  state = fromRow(row, { mode: canAccessCompleteSheet(row) ? "full" : "public" });
   selectedLibraryId = state.id;
   limparSelecaoBiblioteca(false);
   isDirty = false;
+  applyPermissionView(state);
   hydrateForm();
   renderAll();
   ativarAba("identidade");
-  toast("Ficha carregada com sucesso.");
+  toast(permissionMode === "public" ? "Ficha carregada em modo público." : "Ficha carregada com sucesso.");
 }
 
 async function carregarFichaSupabase(id) {
@@ -1014,10 +1058,7 @@ async function carregarBiblioteca() {
 async function listarFichas() {
   sheetList = [];
   if (!user) return [];
-  const { data, error } = await db
-    .from("fichas_rpg")
-    .select("id,user_id,nome,classe,nivel,tema,origem,retrato,personagem,updated_at")
-    .order("updated_at", { ascending: false });
+  const { data, error } = await db.rpc("listar_fichas_visiveis");
   if (error) return handleSupabaseError(error, false);
   sheetList = filtrarFichasPersistidas(data || []);
   if (!sheetList.length) {
@@ -1259,7 +1300,7 @@ function atualizarRecursoLeitura(label, recurso) {
 async function abrirFichaSelecionadaCompleta() {
   if (!selectedLibraryId) return toast("Selecione uma ficha para abrir.", "danger");
   if (!fichaSelecionada) return toast("Selecione uma ficha antes.", "danger");
-  if (!isFichaDoUsuario(fichaSelecionada)) {
+  if (!canAccessCompleteSheet(fichaSelecionada)) {
     return toast("Esta ficha é de outro jogador. Somente visualização disponível.", "danger");
   }
   await carregarFicha(selectedLibraryId);
@@ -1342,6 +1383,7 @@ function novaFicha() {
   }
   limparSelecaoBiblioteca(false);
   state = defaultSheet();
+  state.user_id = user.id;
   selectedLibraryId = null;
   isDirty = false;
   hydrateForm();
@@ -1413,27 +1455,36 @@ function toPayload() {
   };
 }
 
-function fromRow(row) {
+function fromRow(row, options = {}) {
   const sheet = defaultSheet({ withLocalId: false });
   const personagem = row.personagem || {};
+  const mode = options.mode || "full";
+  const isPublicMode = mode === "public";
+  const publicResources = {
+    pv: { atual: Number(personagem.recursos?.pv?.atual ?? personagem.recursos?.hp?.atual ?? 0), maximo: Number(personagem.recursos?.pv?.maximo ?? personagem.recursos?.hp?.maximo ?? 0) },
+    pm: { atual: Number(personagem.recursos?.pm?.atual ?? personagem.recursos?.mp?.atual ?? 0), maximo: Number(personagem.recursos?.pm?.maximo ?? personagem.recursos?.mp?.maximo ?? 0) },
+    pf: { atual: Number(personagem.recursos?.pf?.atual ?? personagem.recursos?.destino?.atual ?? personagem.recursos?.pontosDestino?.atual ?? 0), maximo: Number(personagem.recursos?.pf?.maximo ?? personagem.recursos?.destino?.maximo ?? personagem.recursos?.pontosDestino?.maximo ?? 0) }
+  };
   return {
     ...sheet,
     ...personagem,
     id: row.id,
     localId: personagem.localId || null,
+    user_id: row.user_id || null,
     nome: row.nome || "",
     classe: row.classe || "",
     nivel: row.nivel || 1,
     tema: row.tema || "",
     origem: row.origem || "",
     retrato: row.retrato || "",
-    recursos: { ...sheet.recursos, ...(personagem.recursos || {}) },
-    combate: { ...sheet.combate, ...(personagem.combate || {}) },
-    atributos: { ...sheet.atributos, ...(personagem.atributos || {}) },
-    memorias: personagem.memorias || [],
-    equipamentos: personagem.equipamentos || [],
-    lacos: personagem.lacos || [],
-    rolagens: personagem.rolagens || []
+    recursos: isPublicMode ? publicResources : { ...sheet.recursos, ...(personagem.recursos || {}) },
+    combate: isPublicMode ? { ...sheet.combate } : { ...sheet.combate, ...(personagem.combate || {}) },
+    atributos: isPublicMode ? { ...sheet.atributos } : { ...sheet.atributos, ...(personagem.atributos || {}) },
+    memorias: isPublicMode ? [] : (personagem.memorias || []),
+    equipamentos: isPublicMode ? [] : (personagem.equipamentos || []),
+    lacos: isPublicMode ? [] : (personagem.lacos || []),
+    rolagens: isPublicMode ? [] : (personagem.rolagens || []),
+    isPublicView: isPublicMode
   };
 }
 
@@ -1513,9 +1564,45 @@ function limparHistoricoDados() {
   toast("Historico de dados limpo.");
 }
 
+function renderPublicView() {
+  const container = $("#publicSheetView");
+  if (!container || !state) {
+    if (container) container.innerHTML = "";
+    return;
+  }
+  const portrait = state.retrato || "assets/images/portrait-placeholder.svg";
+  const resources = [
+    { key: "pv", label: "HP", atual: state.recursos.pv?.atual ?? 0, maximo: state.recursos.pv?.maximo ?? 0 },
+    { key: "pm", label: "MP", atual: state.recursos.pm?.atual ?? 0, maximo: state.recursos.pm?.maximo ?? 0 },
+    { key: "pf", label: "Pontos de Destino", atual: state.recursos.pf?.atual ?? 0, maximo: state.recursos.pf?.maximo ?? 0 }
+  ];
+  container.innerHTML = `
+    <div class="public-view-card">
+      <div class="preview-hero">
+        <img src="${escapeHtml(portrait)}" alt="Retrato do personagem" onerror="this.src='assets/images/portrait-placeholder.svg'" />
+        <div class="preview-identity">
+          <p class="eyebrow">Ficha pública</p>
+          <h2>${escapeHtml(state.nome || "Personagem sem nome")}</h2>
+          <p>Você está visualizando a ficha de outro jogador. Apenas informações públicas estão disponíveis.</p>
+        </div>
+      </div>
+      <section class="preview-panel">
+        <h3>Recursos públicos</h3>
+        <div class="preview-stat-grid">
+          ${resources.map((resource) => `<div><span>${escapeHtml(resource.label)}</span><strong>${resource.atual}/${resource.maximo}</strong></div>`).join("")}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
 function renderPreview() {
   if (!state) {
     $("#previewSheet").innerHTML = "";
+    return;
+  }
+  if (permissionMode === "public") {
+    renderPublicView();
     return;
   }
   const portrait = state.retrato || "assets/images/portrait-placeholder.svg";
