@@ -409,6 +409,11 @@ function isAdminUser() {
   return role === "admin" || isAdminFlag === true;
 }
 
+function isCampaignViewContext() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("campaign") === "1" || params.get("campaign") === "true";
+}
+
 function canAccessCompleteSheet(ficha = state) {
   if (!user) return false;
   if (isAdminUser()) return true;
@@ -416,8 +421,12 @@ function canAccessCompleteSheet(ficha = state) {
   return Boolean(ficha?.user_id && ficha.user_id === user.id);
 }
 
+function shouldUsePublicView(ficha = state) {
+  return isCampaignViewContext() && !canAccessCompleteSheet(ficha);
+}
+
 function applyPermissionView(ficha = state) {
-  permissionMode = canAccessCompleteSheet(ficha) ? "full" : "public";
+  permissionMode = shouldUsePublicView(ficha) ? "public" : "full";
   const notice = $("#permissionNotice");
   const publicView = $("#publicSheetView");
   const form = $("#sheetForm");
@@ -764,12 +773,16 @@ async function encontrarFichaExistente() {
 async function carregarFicha(id) {
   if (!id) return;
   setLoading(true);
-  const { data, error } = await db.rpc("get_ficha_visivel", { p_ficha_id: id });
+  const useCampaignPermissions = isCampaignViewContext();
+  const request = useCampaignPermissions
+    ? db.rpc("get_ficha_visivel", { p_ficha_id: id })
+    : db.from("fichas_rpg").select("*").eq("id", id).single();
+  const { data, error } = await request;
   setLoading(false);
   if (error) return handleSupabaseError(error);
-  const row = Array.isArray(data) ? data[0] : data;
+  const row = useCampaignPermissions ? (Array.isArray(data) ? data[0] : data) : data;
   if (!row) return toast("Ficha não encontrada.", "danger");
-  state = fromRow(row, { mode: canAccessCompleteSheet(row) ? "full" : "public" });
+  state = fromRow(row, { mode: shouldUsePublicView(row) ? "public" : "full" });
   selectedLibraryId = state.id;
   limparSelecaoBiblioteca(false);
   isDirty = false;
@@ -1058,7 +1071,11 @@ async function carregarBiblioteca() {
 async function listarFichas() {
   sheetList = [];
   if (!user) return [];
-  const { data, error } = await db.rpc("listar_fichas_visiveis");
+  const { data, error } = await db
+    .from("fichas_rpg")
+    .select("id,user_id,nome,classe,nivel,tema,origem,retrato,personagem,updated_at")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false });
   if (error) return handleSupabaseError(error, false);
   sheetList = filtrarFichasPersistidas(data || []);
   if (!sheetList.length) {
@@ -1091,10 +1108,7 @@ async function renderizarLivros(fichas) {
     const classe = ficha.classe || personagem.identidade?.classe || "Classe indefinida";
     const nivel = ficha.nivel || personagem.identidade?.nivel || 1;
     const tema = ficha.tema || personagem.identidade?.tema || "Tema oculto";
-    const recursos = personagem.recursos || { pv: { atual: 0, maximo: 0 }, pm: { atual: 0, maximo: 0 }, pf: { atual: 0, maximo: 0 } };
-    const resourceSummary = `PV ${recursos.pv.atual}/${recursos.pv.maximo} • PM ${recursos.pm.atual}/${recursos.pm.maximo} • PF ${recursos.pf.atual}/${recursos.pf.maximo}`;
     const isChecked = selectedBookIds.has(ficha.id);
-    const owned = isFichaDoUsuario(ficha);
     return `
       <article class="arcane-book ${selectedLibraryId === ficha.id ? "selected" : ""} ${isChecked ? "multi-selected" : ""}" role="button" tabindex="0" data-book-id="${ficha.id}" data-id="${ficha.id}" style="animation-delay:${Math.min(index * 45, 360)}ms" aria-label="Selecionar ficha ${escapeHtml(nome)}">
         <button class="book-select-toggle" type="button" data-select-book="${ficha.id}" aria-label="Selecionar ${escapeHtml(nome)}" aria-pressed="${isChecked}">
@@ -1103,13 +1117,12 @@ async function renderizarLivros(fichas) {
         <span class="book-rune"><i class="ti ti-book-2"></i></span>
         <span class="book-title">
           <strong>${escapeHtml(nome)}</strong>
-          <span>${escapeHtml(owned ? classe : "Visualização")}</span>
+          <span>${escapeHtml(classe)}</span>
         </span>
         <span class="book-meta">
-          <span>${escapeHtml(owned ? `Nv. ${nivel}` : resourceSummary)}</span>
-          <span>${escapeHtml(owned ? tema : "Apenas leitura")}</span>
+          <span>Nv. ${escapeHtml(nivel)}</span>
+          <span>${escapeHtml(tema)}</span>
         </span>
-        <span class="book-owner ${owned ? "owned" : "readonly"}">${owned ? "Sua ficha" : "Visualização"}</span>
       </article>
     `;
   }).join("");
@@ -1266,26 +1279,26 @@ function preencherPainelLeitura(ficha) {
     return;
   }
   const resumo = resumoFicha(ficha);
-  const owned = isFichaDoUsuario(ficha);
+  const publicView = shouldUsePublicView(ficha);
   panel.classList.remove("hidden");
   $("#readingName").textContent = resumo.nome;
-  $("#readingClass").textContent = owned ? resumo.classe : "Visualização";
-  $("#readingLevel").textContent = owned ? `Nv. ${resumo.nivel}` : "-";
-  $("#readingTheme").textContent = owned ? resumo.tema : "Somente leitura";
-  $("#readingOrigin").textContent = owned ? resumo.origem : "-";
-  $("#readingDefense").textContent = owned ? resumo.defesa : "-";
+  $("#readingClass").textContent = publicView ? "Visualização" : resumo.classe;
+  $("#readingLevel").textContent = publicView ? "-" : `Nv. ${resumo.nivel}`;
+  $("#readingTheme").textContent = publicView ? "Somente leitura" : resumo.tema;
+  $("#readingOrigin").textContent = publicView ? "-" : resumo.origem;
+  $("#readingDefense").textContent = publicView ? "-" : resumo.defesa;
   atualizarRecursoLeitura("Pv", resumo.pv);
   atualizarRecursoLeitura("Pm", resumo.pm);
   atualizarRecursoLeitura("Pf", resumo.pf);
-  $("#readingMemories").innerHTML = owned
-    ? resumo.memorias.length
+  $("#readingMemories").innerHTML = publicView
+    ? "<p>Apenas nome e recursos são visíveis para esta ficha.</p>"
+    : resumo.memorias.length
       ? resumo.memorias.map((memoria) => `<span>${escapeHtml(memoria)}</span>`).join("")
-      : "<p>Nenhum laço registrado.</p>"
-    : "<p>Apenas nome e recursos são visíveis para esta ficha.</p>";
+      : "<p>Nenhum laço registrado.</p>";
   const openButton = $("#openFullSheetBtn");
   if (openButton) {
-    openButton.disabled = !owned;
-    openButton.textContent = owned ? "Abrir Ficha Completa" : "Apenas visualização";
+    openButton.disabled = publicView;
+    openButton.textContent = publicView ? "Apenas visualização" : "Abrir Ficha Completa";
   }
 }
 
@@ -1300,7 +1313,7 @@ function atualizarRecursoLeitura(label, recurso) {
 async function abrirFichaSelecionadaCompleta() {
   if (!selectedLibraryId) return toast("Selecione uma ficha para abrir.", "danger");
   if (!fichaSelecionada) return toast("Selecione uma ficha antes.", "danger");
-  if (!canAccessCompleteSheet(fichaSelecionada)) {
+  if (shouldUsePublicView(fichaSelecionada)) {
     return toast("Esta ficha é de outro jogador. Somente visualização disponível.", "danger");
   }
   await carregarFicha(selectedLibraryId);
