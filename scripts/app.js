@@ -1474,23 +1474,24 @@ function fromRow(row, options = {}) {
   const mode = options.mode || "full";
   const isPublicMode = mode === "public";
   const publicResources = {
-    pv: { atual: Number(personagem.recursos?.pv?.atual ?? personagem.recursos?.hp?.atual ?? 0), maximo: Number(personagem.recursos?.pv?.maximo ?? personagem.recursos?.hp?.maximo ?? 0) },
-    pm: { atual: Number(personagem.recursos?.pm?.atual ?? personagem.recursos?.mp?.atual ?? 0), maximo: Number(personagem.recursos?.pm?.maximo ?? personagem.recursos?.mp?.maximo ?? 0) },
-    pf: { atual: Number(personagem.recursos?.pf?.atual ?? personagem.recursos?.destino?.atual ?? personagem.recursos?.pontosDestino?.atual ?? 0), maximo: Number(personagem.recursos?.pf?.maximo ?? personagem.recursos?.destino?.maximo ?? personagem.recursos?.pontosDestino?.maximo ?? 0) }
+    pv: { atual: Number(personagem.recursos?.pv?.atual ?? personagem.recursos?.hp?.atual ?? row.recursos?.hp ?? row.recursos?.pv ?? 0), maximo: Number(personagem.recursos?.pv?.maximo ?? personagem.recursos?.hp?.maximo ?? row.recursos?.hpMax ?? row.recursos?.pvMax ?? 0) },
+    pm: { atual: Number(personagem.recursos?.pm?.atual ?? personagem.recursos?.mp?.atual ?? row.recursos?.mp ?? 0), maximo: Number(personagem.recursos?.pm?.maximo ?? personagem.recursos?.mp?.maximo ?? row.recursos?.mpMax ?? 0) },
+    pf: { atual: Number(personagem.recursos?.pf?.atual ?? personagem.recursos?.destino?.atual ?? personagem.recursos?.pontosDestino?.atual ?? row.recursos?.destino ?? row.recursos?.pontosDestino ?? 0), maximo: Number(personagem.recursos?.pf?.maximo ?? personagem.recursos?.destino?.maximo ?? personagem.recursos?.pontosDestino?.maximo ?? row.recursos?.destinoMax ?? row.recursos?.pontosDestinoMax ?? 0) }
   };
+  const normalizedResources = isPublicMode ? publicResources : { ...sheet.recursos, ...(personagem.recursos || {}) };
   return {
     ...sheet,
     ...personagem,
     id: row.id,
     localId: personagem.localId || null,
     user_id: row.user_id || null,
-    nome: row.nome || "",
-    classe: row.classe || "",
-    nivel: row.nivel || 1,
-    tema: row.tema || "",
-    origem: row.origem || "",
-    retrato: row.retrato || "",
-    recursos: isPublicMode ? publicResources : { ...sheet.recursos, ...(personagem.recursos || {}) },
+    nome: row.nome || personagem.identidade?.nome || "",
+    classe: row.classe || personagem.identidade?.classe || "",
+    nivel: row.nivel || personagem.identidade?.nivel || 1,
+    tema: row.tema || personagem.identidade?.tema || "",
+    origem: row.origem || personagem.identidade?.origem || "",
+    retrato: row.retrato || row.imagem || personagem.identidade?.retrato || "",
+    recursos: normalizedResources,
     combate: isPublicMode ? { ...sheet.combate } : { ...sheet.combate, ...(personagem.combate || {}) },
     atributos: isPublicMode ? { ...sheet.atributos } : { ...sheet.atributos, ...(personagem.atributos || {}) },
     memorias: isPublicMode ? [] : (personagem.memorias || []),
@@ -1589,6 +1590,7 @@ function renderPublicView() {
     { key: "pm", label: "MP", atual: state.recursos.pm?.atual ?? 0, maximo: state.recursos.pm?.maximo ?? 0 },
     { key: "pf", label: "Pontos de Destino", atual: state.recursos.pf?.atual ?? 0, maximo: state.recursos.pf?.maximo ?? 0 }
   ];
+  const visibleResources = resources.filter((resource) => resource.maximo > 0 || resource.atual > 0);
   container.innerHTML = `
     <div class="public-view-card">
       <div class="preview-hero">
@@ -1602,7 +1604,7 @@ function renderPublicView() {
       <section class="preview-panel">
         <h3>Recursos públicos</h3>
         <div class="preview-stat-grid">
-          ${resources.map((resource) => `<div><span>${escapeHtml(resource.label)}</span><strong>${resource.atual}/${resource.maximo}</strong></div>`).join("")}
+          ${visibleResources.length ? visibleResources.map((resource) => `<div><span>${escapeHtml(resource.label)}</span><strong>${resource.atual}/${resource.maximo}</strong></div>`).join("") : '<div><span>Recursos</span><strong>Nenhum recurso público configurado</strong></div>'}
         </div>
       </section>
     </div>

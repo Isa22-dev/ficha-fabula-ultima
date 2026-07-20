@@ -57,7 +57,7 @@ begin
   select * into v_ficha from public.fichas_rpg where id = p_ficha_id;
 
   if not found then
-    return null;
+    return jsonb_build_object('id', p_ficha_id, 'nome', 'Ficha não encontrada', 'modo', 'publico', 'recursos', '{}'::jsonb);
   end if;
 
   if v_user_id = v_ficha.user_id or v_is_admin then
@@ -69,10 +69,9 @@ begin
     'user_id', v_ficha.user_id,
     'nome', v_ficha.nome,
     'retrato', v_ficha.retrato,
-    'personagem', jsonb_build_object(
-      'identidade', jsonb_build_object('nome', v_ficha.nome),
-      'recursos', coalesce(v_ficha.personagem->'recursos', '{}'::jsonb)
-    )
+    'imagem', v_ficha.retrato,
+    'modo', 'publico',
+    'recursos', coalesce(v_ficha.personagem->'recursos', '{}'::jsonb)
   );
 end;
 $$;
