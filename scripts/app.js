@@ -1016,8 +1016,7 @@ async function listarFichas() {
   if (!user) return [];
   const { data, error } = await db
     .from("fichas_rpg")
-    .select("id,nome,classe,nivel,tema,origem,retrato,personagem,updated_at")
-    .eq("user_id", user.id)
+    .select("id,user_id,nome,classe,nivel,tema,origem,retrato,personagem,updated_at")
     .order("updated_at", { ascending: false });
   if (error) return handleSupabaseError(error, false);
   sheetList = filtrarFichasPersistidas(data || []);
@@ -1052,6 +1051,7 @@ async function renderizarLivros(fichas) {
     const nivel = ficha.nivel || personagem.identidade?.nivel || 1;
     const tema = ficha.tema || personagem.identidade?.tema || "Tema oculto";
     const isChecked = selectedBookIds.has(ficha.id);
+    const owned = isFichaDoUsuario(ficha);
     return `
       <article class="arcane-book ${selectedLibraryId === ficha.id ? "selected" : ""} ${isChecked ? "multi-selected" : ""}" role="button" tabindex="0" data-book-id="${ficha.id}" data-id="${ficha.id}" style="animation-delay:${Math.min(index * 45, 360)}ms" aria-label="Selecionar ficha ${escapeHtml(nome)}">
         <button class="book-select-toggle" type="button" data-select-book="${ficha.id}" aria-label="Selecionar ${escapeHtml(nome)}" aria-pressed="${isChecked}">
@@ -1066,6 +1066,7 @@ async function renderizarLivros(fichas) {
           <span>Nv. ${escapeHtml(nivel)}</span>
           <span>${escapeHtml(tema)}</span>
         </span>
+        <span class="book-owner ${owned ? "owned" : "readonly"}">${owned ? "Sua ficha" : "Visualização"}</span>
       </article>
     `;
   }).join("");
@@ -1088,6 +1089,10 @@ function selecionarFicha(ficha) {
   selectedLibraryId = ficha?.id || null;
   console.log("Ficha selecionada:", fichaSelecionada);
   preencherPainelLeitura(ficha || null);
+}
+
+function isFichaDoUsuario(ficha) {
+  return Boolean(user && ficha?.user_id && ficha.user_id === user.id);
 }
 
 function alternarSelecaoLivro(id) {
@@ -1218,19 +1223,27 @@ function preencherPainelLeitura(ficha) {
     return;
   }
   const resumo = resumoFicha(ficha);
+  const owned = isFichaDoUsuario(ficha);
   panel.classList.remove("hidden");
   $("#readingName").textContent = resumo.nome;
-  $("#readingClass").textContent = resumo.classe;
-  $("#readingLevel").textContent = `Nv. ${resumo.nivel}`;
-  $("#readingTheme").textContent = resumo.tema;
-  $("#readingOrigin").textContent = resumo.origem;
-  $("#readingDefense").textContent = resumo.defesa;
+  $("#readingClass").textContent = owned ? resumo.classe : "Visualização";
+  $("#readingLevel").textContent = owned ? `Nv. ${resumo.nivel}` : "-";
+  $("#readingTheme").textContent = owned ? resumo.tema : "Somente leitura";
+  $("#readingOrigin").textContent = owned ? resumo.origem : "-";
+  $("#readingDefense").textContent = owned ? resumo.defesa : "-";
   atualizarRecursoLeitura("Pv", resumo.pv);
   atualizarRecursoLeitura("Pm", resumo.pm);
   atualizarRecursoLeitura("Pf", resumo.pf);
-  $("#readingMemories").innerHTML = resumo.memorias.length
-    ? resumo.memorias.map((memoria) => `<span>${escapeHtml(memoria)}</span>`).join("")
-    : "<p>Nenhum laço registrado.</p>";
+  $("#readingMemories").innerHTML = owned
+    ? resumo.memorias.length
+      ? resumo.memorias.map((memoria) => `<span>${escapeHtml(memoria)}</span>`).join("")
+      : "<p>Nenhum laço registrado.</p>"
+    : "<p>Apenas nome e recursos são visíveis para esta ficha.</p>";
+  const openButton = $("#openFullSheetBtn");
+  if (openButton) {
+    openButton.disabled = !owned;
+    openButton.textContent = owned ? "Abrir Ficha Completa" : "Apenas visualização";
+  }
 }
 
 function atualizarRecursoLeitura(label, recurso) {
@@ -1243,6 +1256,10 @@ function atualizarRecursoLeitura(label, recurso) {
 
 async function abrirFichaSelecionadaCompleta() {
   if (!selectedLibraryId) return toast("Selecione uma ficha para abrir.", "danger");
+  if (!fichaSelecionada) return toast("Selecione uma ficha antes.", "danger");
+  if (!isFichaDoUsuario(fichaSelecionada)) {
+    return toast("Esta ficha é de outro jogador. Somente visualização disponível.", "danger");
+  }
   await carregarFicha(selectedLibraryId);
 }
 
