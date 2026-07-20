@@ -1050,6 +1050,8 @@ async function renderizarLivros(fichas) {
     const classe = ficha.classe || personagem.identidade?.classe || "Classe indefinida";
     const nivel = ficha.nivel || personagem.identidade?.nivel || 1;
     const tema = ficha.tema || personagem.identidade?.tema || "Tema oculto";
+    const recursos = personagem.recursos || { pv: { atual: 0, maximo: 0 }, pm: { atual: 0, maximo: 0 }, pf: { atual: 0, maximo: 0 } };
+    const resourceSummary = `PV ${recursos.pv.atual}/${recursos.pv.maximo} • PM ${recursos.pm.atual}/${recursos.pm.maximo} • PF ${recursos.pf.atual}/${recursos.pf.maximo}`;
     const isChecked = selectedBookIds.has(ficha.id);
     const owned = isFichaDoUsuario(ficha);
     return `
@@ -1060,11 +1062,11 @@ async function renderizarLivros(fichas) {
         <span class="book-rune"><i class="ti ti-book-2"></i></span>
         <span class="book-title">
           <strong>${escapeHtml(nome)}</strong>
-          <span>${escapeHtml(classe)}</span>
+          <span>${escapeHtml(owned ? classe : "Visualização")}</span>
         </span>
         <span class="book-meta">
-          <span>Nv. ${escapeHtml(nivel)}</span>
-          <span>${escapeHtml(tema)}</span>
+          <span>${escapeHtml(owned ? `Nv. ${nivel}` : resourceSummary)}</span>
+          <span>${escapeHtml(owned ? tema : "Apenas leitura")}</span>
         </span>
         <span class="book-owner ${owned ? "owned" : "readonly"}">${owned ? "Sua ficha" : "Visualização"}</span>
       </article>
