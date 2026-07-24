@@ -1084,13 +1084,24 @@ async function carregarBiblioteca() {
 async function listarFichas() {
   sheetList = [];
   if (!user) return [];
-  const { data, error } = await db
-    .from("fichas_rpg")
-    .select("id,user_id,nome,classe,nivel,tema,origem,retrato,personagem,updated_at")
-    .eq("user_id", user.id)
-    .order("updated_at", { ascending: false });
-  if (error) return handleSupabaseError(error, false);
-  sheetList = filtrarFichasPersistidas(data || []);
+
+  let rows = [];
+
+  if (isCampaignViewContext()) {
+    const { data, error } = await db.rpc("listar_fichas_visiveis");
+    if (error) return handleSupabaseError(error, false);
+    rows = Array.isArray(data) ? data : [];
+  } else {
+    const { data, error } = await db
+      .from("fichas_rpg")
+      .select("id,user_id,nome,classe,nivel,tema,origem,retrato,personagem,updated_at")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false });
+    if (error) return handleSupabaseError(error, false);
+    rows = data || [];
+  }
+
+  sheetList = filtrarFichasPersistidas(rows);
   if (!sheetList.length) {
     renderizarLivros([]);
     if (!state?.id) clearActiveSheet();
