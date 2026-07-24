@@ -141,20 +141,11 @@ drop policy if exists "update_admin_fichas_rpg" on public.fichas_rpg;
 drop policy if exists "delete_own_fichas_rpg" on public.fichas_rpg;
 drop policy if exists "delete_admin_fichas_rpg" on public.fichas_rpg;
 
-create policy "select_own_fichas_rpg"
+create policy "select_all_fichas_rpg"
 on public.fichas_rpg
 for select
 to authenticated
-using (
-  auth.uid() = user_id
-  or public.is_admin_user()
-);
-
-create policy "select_admin_fichas_rpg"
-on public.fichas_rpg
-for select
-to authenticated
-using (public.is_admin_user());
+using (true);
 
 create policy "insert_own_fichas_rpg"
 on public.fichas_rpg
