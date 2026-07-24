@@ -422,10 +422,7 @@ function canAccessCompleteSheet(ficha = state) {
 }
 
 function shouldUsePublicView(ficha = state) {
-  if (!user) return false;
-  if (isAdminUser()) return false;
-  if (!ficha?.id) return false;
-  return !canAccessCompleteSheet(ficha);
+  return isCampaignViewContext() && !canAccessCompleteSheet(ficha);
 }
 
 function applyPermissionView(ficha = state) {
@@ -776,34 +773,24 @@ async function encontrarFichaExistente() {
 async function carregarFicha(id) {
   if (!id) return;
   setLoading(true);
-
-  try {
-    const { data, error } = await db.rpc("get_ficha_visivel", { p_ficha_id: id });
-    if (error) {
-      throw error;
-    }
-
-    const row = Array.isArray(data) ? data[0] : data;
-    if (!row) {
-      setLoading(false);
-      return toast("Ficha não encontrada.", "danger");
-    }
-
-    const isPublicMode = shouldUsePublicView(row);
-    state = fromRow(row, { mode: isPublicMode ? "public" : "full" });
-    selectedLibraryId = state.id;
-    limparSelecaoBiblioteca(false);
-    isDirty = false;
-    applyPermissionView(state);
-    hydrateForm();
-    renderAll();
-    ativarAba("identidade");
-    toast(isPublicMode ? "Ficha carregada em modo público." : "Ficha carregada com sucesso.");
-  } catch (error) {
-    handleSupabaseError(error);
-  } finally {
-    setLoading(false);
-  }
+  const useCampaignPermissions = isCampaignViewContext();
+  const request = useCampaignPermissions
+    ? db.rpc("get_ficha_visivel", { p_ficha_id: id })
+    : db.from("fichas_rpg").select("*").eq("id", id).single();
+  const { data, error } = await request;
+  setLoading(false);
+  if (error) return handleSupabaseError(error);
+  const row = useCampaignPermissions ? (Array.isArray(data) ? data[0] : data) : data;
+  if (!row) return toast("Ficha não encontrada.", "danger");
+  state = fromRow(row, { mode: shouldUsePublicView(row) ? "public" : "full" });
+  selectedLibraryId = state.id;
+  limparSelecaoBiblioteca(false);
+  isDirty = false;
+  applyPermissionView(state);
+  hydrateForm();
+  renderAll();
+  ativarAba("identidade");
+  toast(permissionMode === "public" ? "Ficha carregada em modo público." : "Ficha carregada com sucesso.");
 }
 
 async function carregarFichaSupabase(id) {
