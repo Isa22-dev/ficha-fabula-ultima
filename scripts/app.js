@@ -1073,10 +1073,16 @@ async function listarFichas() {
   if (!user) return [];
 
   const { data, error } = await db.rpc("listar_fichas_visiveis");
-  if (error) return handleSupabaseError(error, false);
+  console.log("[biblioteca] resultado bruto do Supabase:", { data, error });
+  if (error) {
+    console.error("[biblioteca] erro ao buscar fichas:", error);
+    return handleSupabaseError(error, false);
+  }
 
   const rows = Array.isArray(data) ? data : [];
+  console.log("[biblioteca] quantidade recebida:", rows.length);
   sheetList = filtrarFichasPersistidas(rows);
+  console.log("[biblioteca] quantidade renderizada:", sheetList.length);
   if (!sheetList.length) {
     renderizarLivros([]);
     if (!state?.id) clearActiveSheet();
