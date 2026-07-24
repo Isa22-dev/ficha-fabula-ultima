@@ -422,7 +422,10 @@ function canAccessCompleteSheet(ficha = state) {
 }
 
 function shouldUsePublicView(ficha = state) {
-  return isCampaignViewContext() && !canAccessCompleteSheet(ficha);
+  if (!user) return false;
+  if (isAdminUser()) return false;
+  if (!ficha?.id) return false;
+  return !canAccessCompleteSheet(ficha);
 }
 
 function applyPermissionView(ficha = state) {
@@ -773,24 +776,34 @@ async function encontrarFichaExistente() {
 async function carregarFicha(id) {
   if (!id) return;
   setLoading(true);
-  const useCampaignPermissions = isCampaignViewContext();
-  const request = useCampaignPermissions
-    ? db.rpc("get_ficha_visivel", { p_ficha_id: id })
-    : db.from("fichas_rpg").select("*").eq("id", id).single();
-  const { data, error } = await request;
-  setLoading(false);
-  if (error) return handleSupabaseError(error);
-  const row = useCampaignPermissions ? (Array.isArray(data) ? data[0] : data) : data;
-  if (!row) return toast("Ficha não encontrada.", "danger");
-  state = fromRow(row, { mode: shouldUsePublicView(row) ? "public" : "full" });
-  selectedLibraryId = state.id;
-  limparSelecaoBiblioteca(false);
-  isDirty = false;
-  applyPermissionView(state);
-  hydrateForm();
-  renderAll();
-  ativarAba("identidade");
-  toast(permissionMode === "public" ? "Ficha carregada em modo público." : "Ficha carregada com sucesso.");
+
+  try {
+    const { data, error } = await db.rpc("get_ficha_visivel", { p_ficha_id: id });
+    if (error) {
+      throw error;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) {
+      setLoading(false);
+      return toast("Ficha não encontrada.", "danger");
+    }
+
+    const isPublicMode = shouldUsePublicView(row);
+    state = fromRow(row, { mode: isPublicMode ? "public" : "full" });
+    selectedLibraryId = state.id;
+    limparSelecaoBiblioteca(false);
+    isDirty = false;
+    applyPermissionView(state);
+    hydrateForm();
+    renderAll();
+    ativarAba("identidade");
+    toast(isPublicMode ? "Ficha carregada em modo público." : "Ficha carregada com sucesso.");
+  } catch (error) {
+    handleSupabaseError(error);
+  } finally {
+    setLoading(false);
+  }
 }
 
 async function carregarFichaSupabase(id) {
@@ -1313,9 +1326,6 @@ function atualizarRecursoLeitura(label, recurso) {
 async function abrirFichaSelecionadaCompleta() {
   if (!selectedLibraryId) return toast("Selecione uma ficha para abrir.", "danger");
   if (!fichaSelecionada) return toast("Selecione uma ficha antes.", "danger");
-  if (shouldUsePublicView(fichaSelecionada)) {
-    return toast("Esta ficha é de outro jogador. Somente visualização disponível.", "danger");
-  }
   await carregarFicha(selectedLibraryId);
 }
 
@@ -1323,7 +1333,7 @@ function resumoFicha(ficha) {
   const personagem = ficha.personagem || {};
   const identidade = personagem.identidade || {};
   const combate = personagem.combate || {};
-  const recursosFicha = personagem.recursos || {};
+  const recursosFicha = ficha.recursos || personagem.recursos || {};
   const lacos = Array.isArray(personagem.lacos) && personagem.lacos.length
     ? personagem.lacos.slice(0, 3)
     : Array.isArray(personagem.memorias) ? personagem.memorias.slice(0, 3) : [];
@@ -1473,12 +1483,22 @@ function fromRow(row, options = {}) {
   const personagem = row.personagem || {};
   const mode = options.mode || "full";
   const isPublicMode = mode === "public";
+  const resourceData = row.recursos || personagem.recursos || {};
   const publicResources = {
-    pv: { atual: Number(personagem.recursos?.pv?.atual ?? personagem.recursos?.hp?.atual ?? row.recursos?.hp ?? row.recursos?.pv ?? 0), maximo: Number(personagem.recursos?.pv?.maximo ?? personagem.recursos?.hp?.maximo ?? row.recursos?.hpMax ?? row.recursos?.pvMax ?? 0) },
-    pm: { atual: Number(personagem.recursos?.pm?.atual ?? personagem.recursos?.mp?.atual ?? row.recursos?.mp ?? 0), maximo: Number(personagem.recursos?.pm?.maximo ?? personagem.recursos?.mp?.maximo ?? row.recursos?.mpMax ?? 0) },
-    pf: { atual: Number(personagem.recursos?.pf?.atual ?? personagem.recursos?.destino?.atual ?? personagem.recursos?.pontosDestino?.atual ?? row.recursos?.destino ?? row.recursos?.pontosDestino ?? 0), maximo: Number(personagem.recursos?.pf?.maximo ?? personagem.recursos?.destino?.maximo ?? personagem.recursos?.pontosDestino?.maximo ?? row.recursos?.destinoMax ?? row.recursos?.pontosDestinoMax ?? 0) }
+    pv: {
+      atual: Number(resourceData?.pv?.atual ?? resourceData?.pv?.current ?? resourceData?.hp?.atual ?? resourceData?.hp?.current ?? resourceData?.pv ?? resourceData?.hp ?? 0),
+      maximo: Number(resourceData?.pv?.maximo ?? resourceData?.pv?.max ?? resourceData?.hp?.maximo ?? resourceData?.hp?.max ?? resourceData?.pvMax ?? resourceData?.hpMax ?? 0)
+    },
+    pm: {
+      atual: Number(resourceData?.pm?.atual ?? resourceData?.pm?.current ?? resourceData?.mp?.atual ?? resourceData?.mp?.current ?? resourceData?.pm ?? resourceData?.mp ?? 0),
+      maximo: Number(resourceData?.pm?.maximo ?? resourceData?.pm?.max ?? resourceData?.mp?.maximo ?? resourceData?.mp?.max ?? resourceData?.pmMax ?? resourceData?.mpMax ?? 0)
+    },
+    pf: {
+      atual: Number(resourceData?.pf?.atual ?? resourceData?.pf?.current ?? resourceData?.destino?.atual ?? resourceData?.destino?.current ?? resourceData?.pontosDestino?.atual ?? resourceData?.pontosDestino?.current ?? resourceData?.pf ?? resourceData?.destino ?? resourceData?.pontosDestino ?? 0),
+      maximo: Number(resourceData?.pf?.maximo ?? resourceData?.pf?.max ?? resourceData?.destino?.maximo ?? resourceData?.destino?.max ?? resourceData?.pontosDestino?.maximo ?? resourceData?.pontosDestino?.max ?? resourceData?.pfMax ?? resourceData?.destinoMax ?? resourceData?.pontosDestinoMax ?? 0)
+    }
   };
-  const normalizedResources = isPublicMode ? publicResources : { ...sheet.recursos, ...(personagem.recursos || {}) };
+  const normalizedResources = isPublicMode ? publicResources : { ...sheet.recursos, ...(personagem.recursos || resourceData || {}) };
   return {
     ...sheet,
     ...personagem,
