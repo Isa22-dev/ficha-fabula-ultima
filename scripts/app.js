@@ -1349,6 +1349,7 @@ function filtrarFichasPersistidas(fichas) {
 }
 
 function fichaTemConteudo(ficha) {
+  if (!ficha || typeof ficha !== "object") return false;
   const personagem = ficha.personagem || ficha || {};
   const identidade = personagem.identidade || {};
   const camposVisiveis = [
@@ -1382,7 +1383,8 @@ function fichaTemConteudo(ficha) {
     personagem.condicoes
   ];
   const listas = [personagem.memorias, personagem.equipamentos, personagem.lacos, personagem.rolagens, ficha.memorias, ficha.equipamentos, ficha.lacos, ficha.rolagens];
-  return camposVisiveis.some((valor) => String(valor || "").trim()) || listas.some((lista) => Array.isArray(lista) && lista.length > 0);
+  const hasVisibleContent = camposVisiveis.some((valor) => String(valor || "").trim()) || listas.some((lista) => Array.isArray(lista) && lista.length > 0);
+  return hasVisibleContent || Boolean(ficha.id);
 }
 
 function novaFicha() {
