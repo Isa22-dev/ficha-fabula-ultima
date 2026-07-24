@@ -145,7 +145,10 @@ create policy "select_own_fichas_rpg"
 on public.fichas_rpg
 for select
 to authenticated
-using (auth.uid() = user_id);
+using (
+  auth.uid() = user_id
+  or public.is_admin_user()
+);
 
 create policy "select_admin_fichas_rpg"
 on public.fichas_rpg
