@@ -775,32 +775,18 @@ async function carregarFicha(id) {
   setLoading(true);
 
   try {
-    const { data, error } = await db
-      .from("fichas_rpg")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
-
+    const { data, error } = await db.rpc("get_ficha_visivel", { p_ficha_id: id });
     if (error) {
       throw error;
     }
 
-    const row = data;
+    const row = Array.isArray(data) ? data[0] : data;
     if (!row) {
-      const rpcResult = await db.rpc("get_ficha_visivel", { p_ficha_id: id });
-      if (rpcResult.error) {
-        throw rpcResult.error;
-      }
-      const rpcRow = Array.isArray(rpcResult.data) ? rpcResult.data[0] : rpcResult.data;
-      if (!rpcRow) {
-        setLoading(false);
-        return toast("Ficha não encontrada.", "danger");
-      }
-      state = fromRow(rpcRow, { mode: shouldUsePublicView(rpcRow) ? "public" : "full" });
-    } else {
-      state = fromRow(row, { mode: shouldUsePublicView(row) ? "public" : "full" });
+      setLoading(false);
+      return toast("Ficha não encontrada.", "danger");
     }
 
+    state = fromRow(row, { mode: shouldUsePublicView(row) ? "public" : "full" });
     selectedLibraryId = state.id;
     limparSelecaoBiblioteca(false);
     isDirty = false;
@@ -1097,11 +1083,7 @@ async function listarFichas() {
   if (!user) return [];
 
   try {
-    const { data, error } = await db
-      .from("fichas_rpg")
-      .select("id,user_id,nome,classe,nivel,tema,origem,retrato,personagem,updated_at")
-      .order("updated_at", { ascending: false });
-
+    const { data, error } = await db.rpc("listar_fichas_visiveis");
     if (error) {
       throw error;
     }
