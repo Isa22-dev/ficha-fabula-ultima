@@ -334,30 +334,28 @@ function bindEvents() {
     const roll = event.target.closest("[data-die]");
     const attrRoll = event.target.closest("[data-roll-attribute]");
     const themeOption = event.target.closest("[data-theme-option]");
-    const book = event.target.closest("[data-book-id]");
+    const bookOpen = event.target.closest("[data-open-book]");
     const bookSelect = event.target.closest("[data-select-book]");
     if (remove && state) removeItem(remove.dataset.remove, Number(remove.dataset.index));
     if (roll && state) rollDie(Number(roll.dataset.die));
     if (attrRoll && state) rolarAtributo(attrRoll.dataset.rollAttribute);
+    if (bookOpen) {
+      event.preventDefault();
+      abrirLivroFicha(bookOpen.dataset.openBook);
+      return;
+    }
     if (bookSelect) {
       event.preventDefault();
       event.stopPropagation();
       alternarSelecaoLivro(bookSelect.dataset.selectBook);
       return;
     }
-    if (book) abrirLivroFicha(book.dataset.bookId);
     if (themeOption) {
       setTheme(themeOption.dataset.themeOption);
     }
   });
 
   document.addEventListener("keydown", (event) => {
-    const book = event.target.closest?.("[data-book-id]");
-    if (book && (event.key === "Enter" || event.key === " ")) {
-      event.preventDefault();
-      abrirLivroFicha(book.dataset.bookId);
-      return;
-    }
     if (event.key === "Escape" && deleteModalOpen) {
       fecharModalExclusao(true);
       return;
@@ -1148,10 +1146,7 @@ async function renderizarLivros(fichas) {
     const tema = ficha.tema || personagem.identidade?.tema || "Tema oculto";
     const isChecked = selectedBookIds.has(ficha.id);
     return `
-      <article class="arcane-book ${selectedLibraryId === ficha.id ? "selected" : ""} ${isChecked ? "multi-selected" : ""}" role="button" tabindex="0" data-book-id="${ficha.id}" data-id="${ficha.id}" style="animation-delay:${Math.min(index * 45, 360)}ms" aria-label="Selecionar ficha ${escapeHtml(nome)}">
-        <button class="book-select-toggle" type="button" data-select-book="${ficha.id}" aria-label="Selecionar ${escapeHtml(nome)}" aria-pressed="${isChecked}">
-          <i class="ti ${isChecked ? "ti-check" : "ti-square"}"></i>
-        </button>
+      <article class="arcane-book ${selectedLibraryId === ficha.id ? "selected" : ""} ${isChecked ? "multi-selected" : ""}" data-id="${ficha.id}" style="animation-delay:${Math.min(index * 45, 360)}ms">
         <span class="book-rune"><i class="ti ti-book-2"></i></span>
         <span class="book-title">
           <strong>${escapeHtml(nome)}</strong>
@@ -1160,6 +1155,16 @@ async function renderizarLivros(fichas) {
         <span class="book-meta">
           <span>Nv. ${escapeHtml(nivel)}</span>
           <span>${escapeHtml(tema)}</span>
+        </span>
+        <span class="book-actions">
+          <button class="book-open-button" type="button" data-open-book="${ficha.id}" aria-label="Abrir ficha ${escapeHtml(nome)}">
+            <i class="ti ti-door-enter"></i>
+            <span>Abrir</span>
+          </button>
+          <button class="book-select-toggle" type="button" data-select-book="${ficha.id}" aria-label="Selecionar ${escapeHtml(nome)} para exclusão" aria-pressed="${isChecked}">
+            <i class="ti ${isChecked ? "ti-check" : "ti-square"}"></i>
+            <span>${isChecked ? "Selecionada" : "Selecionar"}</span>
+          </button>
         </span>
       </article>
     `;
@@ -1175,7 +1180,7 @@ async function abrirLivroFicha(id) {
   selectedLibraryId = id;
   const ficha = sheetList.find((item) => item.id === id);
   selecionarFicha(ficha || null);
-  renderizarLivros(sheetList);
+  await carregarFicha(id);
 }
 
 function selecionarFicha(ficha) {

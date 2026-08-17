@@ -742,7 +742,7 @@ label,
 
 .arcane-book {
   position: relative;
-  min-height: 230px;
+  min-height: 250px;
   display: grid;
   align-content: space-between;
   gap: 16px;
@@ -754,7 +754,7 @@ label,
     linear-gradient(90deg, rgba(0, 0, 0, 0.34) 0 12px, transparent 12px),
     linear-gradient(145deg, rgba(23, 16, 32, 0.96), rgba(72, 35, 92, 0.82));
   box-shadow: 0 22px 42px rgba(0, 0, 0, 0.28), inset 7px 0 0 rgba(216, 181, 109, 0.18);
-  cursor: pointer;
+  cursor: default;
   overflow: hidden;
   text-align: left;
   animation: bookEnter 0.42s ease both;
@@ -808,33 +808,47 @@ label,
   background: #d8b56d;
 }
 
-.book-select-toggle {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+.book-actions {
+  position: relative;
   z-index: 2;
-  width: 30px;
-  height: 30px;
   display: grid;
-  place-items: center;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.book-open-button,
+.book-select-toggle {
+  width: 100%;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border: 1px solid rgba(216, 181, 109, 0.58);
   border-radius: 8px;
+  padding: 0 12px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.book-open-button {
+  color: #171020;
+  background: #d8b56d;
+  font-weight: 900;
+}
+
+.book-select-toggle {
   color: #d8b56d;
   background: rgba(10, 7, 16, 0.88);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
-  opacity: 0;
-  transform: translateY(-4px);
-  transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease;
+  font-weight: 800;
 }
 
-.arcane-book:hover .book-select-toggle,
-.arcane-book:focus-visible .book-select-toggle,
-.arcane-book.multi-selected .book-select-toggle {
-  opacity: 1;
-  transform: translateY(0);
+.book-open-button:hover,
+.book-select-toggle:hover {
+  transform: translateY(-1px);
+  border-color: #d8b56d;
 }
 
-.book-select-toggle:hover,
 .book-select-toggle[aria-pressed="true"] {
   color: #171020;
   background: #d8b56d;
@@ -2457,7 +2471,7 @@ select:focus {
   }
 
   .arcane-book {
-    min-height: 180px;
+    min-height: 220px;
   }
 
   .reading-actions,
