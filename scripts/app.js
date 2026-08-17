@@ -320,7 +320,6 @@ function bindEvents() {
   $("#profilePhotoInput").addEventListener("change", importarFotoPerfil);
   $("#removePhotoBtn").addEventListener("click", removerFotoPerfil);
   $("#settingsTopBtn").addEventListener("click", abrirConfiguracoes);
-  $("#backToLibraryBtn").addEventListener("click", voltarParaBiblioteca);
   $("#deleteSelectedBooksBtn").addEventListener("click", abrirModalExclusaoSelecionadas);
   $("#cancelBookSelectionBtn").addEventListener("click", limparSelecaoBiblioteca);
   $("#openFullSheetBtn").addEventListener("click", abrirFichaSelecionadaCompleta);
@@ -393,7 +392,6 @@ function updateWorkspaceState() {
   $("#sheetForm").classList.toggle("hidden", !editorVisible || isPublicView);
   $("#publicSheetView").classList.toggle("hidden", !editorVisible || !isPublicView);
   $("#emptyState").classList.add("hidden");
-  $("#backToLibraryBtn").classList.toggle("hidden", !editorVisible);
   $("#saveBtnTop").disabled = !editorVisible || isPublicView;
   $("#newSheetBtn").disabled = !hasUser;
   $("#deleteBtn").disabled = !editorVisible || !state?.id || isPublicView;
