@@ -417,8 +417,10 @@ function isCampaignViewContext() {
 function canAccessCompleteSheet(ficha = state) {
   if (!user) return false;
   if (isAdminUser()) return true;
-  if (!ficha?.id && !ficha?.user_id) return true;
-  return Boolean(ficha?.user_id && ficha.user_id === user.id);
+  const ownerId = ficha?.user_id || ficha?.owner_id;
+  if (!ficha?.id && !ownerId) return true;
+  const isOwner = ownerId === user.id;
+  return Boolean(isOwner);
 }
 
 function shouldUsePublicView(ficha = state) {
@@ -772,15 +774,28 @@ async function encontrarFichaExistente() {
 
 async function carregarFicha(id) {
   if (!id) return;
+  if (!user) return toast("Entre para abrir sua ficha.", "danger");
   setLoading(true);
+  console.log("[diagnostico] abrir ficha: id=", id, "user=", user?.id);
+  console.log("USER ID:", user?.id);
+  console.log("CHARACTER ID:", id);
 
   try {
-    const { data, error } = await db.rpc("get_ficha_visivel", { p_ficha_id: id });
+    const { data, error } = await db
+      .from("fichas_rpg")
+      .select("*")
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .single();
+    console.log("CHARACTER DATA:", data);
+    console.log("SUPABASE ERROR:", error);
+
     if (error) {
       throw error;
     }
 
-    const row = Array.isArray(data) ? data[0] : data;
+    const row = data;
+    console.log("[diagnostico] registro da ficha propria:", row);
     if (!row) {
       setLoading(false);
       return toast("Ficha não encontrada.", "danger");
@@ -1082,8 +1097,14 @@ async function listarFichas() {
   sheetList = [];
   if (!user) return [];
 
+  console.log("[diagnostico] listar fichas: user=", user?.id);
   try {
-    const { data, error } = await db.rpc("listar_fichas_visiveis");
+    const { data, error } = await db
+      .from("fichas_rpg")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false });
+    console.log("[diagnostico] Supabase select fichas proprias resposta:", { data, error });
     if (error) {
       throw error;
     }
@@ -1165,7 +1186,9 @@ function selecionarFicha(ficha) {
 }
 
 function isFichaDoUsuario(ficha) {
-  return Boolean(user && ficha?.user_id && ficha.user_id === user.id);
+  const ownerId = ficha?.user_id || ficha?.owner_id;
+  const isOwner = ownerId === user?.id;
+  return Boolean(isOwner);
 }
 
 function alternarSelecaoLivro(id) {
