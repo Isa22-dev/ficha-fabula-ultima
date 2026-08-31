@@ -891,22 +891,34 @@ async function carregarFicha(id) {
   console.log("CHARACTER ID:", id);
 
   try {
-    const { data, error } = await db.rpc("get_ficha_visivel", { p_ficha_id: id });
-    console.log("CHARACTER DATA:", data);
+    let row = null;
+    let error = null;
+
+    const rpcResult = await db.rpc("get_ficha_visivel", { p_ficha_id: id });
+    row = rpcResult?.data;
+    error = rpcResult?.error;
+    console.log("CHARACTER DATA:", row);
     console.log("SUPABASE ERROR:", error);
+
+    if (error || !row) {
+      console.warn("[ficha] RPC falhou para ficha salva; tentando fallback direto ao banco:", error);
+      const fallback = await db.from("fichas_rpg").select("*").eq("id", id).maybeSingle();
+      row = fallback?.data || null;
+      error = fallback?.error || null;
+      console.log("[ficha] fallback direct select:", { data: row, error });
+    }
 
     if (error) {
       throw error;
     }
 
-    const row = data;
-    console.log("[diagnostico] registro da ficha propria:", row);
     if (!row) {
       setLoading(false);
       return toast("Ficha não encontrada.", "danger");
     }
 
-    state = fromRow(row, { mode: row.modo === "publico" || shouldUsePublicView(row) ? "public" : "full" });
+    const mode = row?.modo === "publico" || shouldUsePublicView(row) ? "public" : "full";
+    state = fromRow(row, { mode });
     selectedLibraryId = state.id;
     limparSelecaoBiblioteca(false);
     isDirty = false;
@@ -1219,13 +1231,24 @@ async function listarFichas() {
 
   console.log("[diagnostico] listar fichas: user=", user?.id);
   try {
-    const { data, error } = await db.rpc("listar_fichas_visiveis");
-    console.log("[diagnostico] Supabase select fichas da mesa resposta:", { data, error });
-    if (error) {
-      throw error;
+    let rows = [];
+    let error = null;
+
+    const rpcResult = await db.rpc("listar_fichas_visiveis");
+    rows = Array.isArray(rpcResult?.data) ? rpcResult.data : [];
+    error = rpcResult?.error || null;
+    console.log("[diagnostico] Supabase select fichas da mesa resposta:", { data: rows, error });
+
+    if (error || !rows.length) {
+      console.warn("[biblioteca] RPC falhou ou retornou vazio; usando fallback direto ao banco para preservar fichas antigas:", error);
+      const fallback = await db.from("fichas_rpg").select("*").order("updated_at", { ascending: false });
+      rows = Array.isArray(fallback?.data) ? fallback.data : [];
+      console.log("[biblioteca] fallback direct select:", { data: rows, error: fallback?.error });
+      if (fallback?.error) {
+        throw fallback.error;
+      }
     }
 
-    const rows = Array.isArray(data) ? data : [];
     sheetList = filtrarFichasPersistidas(rows);
     if (!sheetList.length) {
       renderizarLivros([]);
