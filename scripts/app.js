@@ -787,7 +787,13 @@ function upsertPublicStatus(status) {
 }
 
 function mergePublicStatus(previous, status) {
-  const recursos = status.recursos || previous.recursos || previous.personagem?.recursos || {};
+  const recursos = normalizeResourceMap({
+    ...(status.recursos || {}),
+    ...(previous.recursos || {}),
+    ...(previous.personagem?.recursos || {}),
+    ...(status || {}),
+    ...(previous || {})
+  });
   return {
     ...previous,
     id: status.id,
@@ -802,9 +808,9 @@ function mergePublicStatus(previous, status) {
         nome: status.nome || previous.nome || previous.personagem?.identidade?.nome || "Ficha sem titulo",
         retrato: status.retrato || status.imagem || previous.retrato || ""
       },
-      recursos
+      recursos: { pv: recursos.pv, pm: recursos.pm, pf: recursos.pf }
     },
-    recursos
+    recursos: { pv: recursos.pv, pm: recursos.pm, pf: recursos.pf }
   };
 }
 
@@ -1497,7 +1503,9 @@ function renderPlayersResourcePanel() {
     list.innerHTML = '<div class="players-empty">Entre para ver os recursos da mesa.</div>';
     return;
   }
+  console.log("[painel] usuário atual:", user?.id);
   const fichas = filtrarFichasPersistidas(sheetList);
+  console.log("[painel] fichas carregadas:", fichas.length, fichas);
   if (!fichas.length) {
     list.innerHTML = '<div class="players-empty">Nenhuma ficha cadastrada na mesa.</div>';
     return;
@@ -1519,6 +1527,32 @@ function renderPlayersResourcePanel() {
       </article>
     `;
   }).join("");
+}
+
+function normalizeResourceNumber(value, fallback = 0) {
+  const numeric = Number(value ?? fallback);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function normalizeResourceMap(rawValue = {}) {
+  const source = rawValue && typeof rawValue === "object" ? rawValue : {};
+  const pv = source.pv || source.vida || source.hp || {};
+  const pm = source.pm || source.mana || source.mp || {};
+  const pf = source.pf || source.destino || source.pontosDestino || {};
+  return {
+    pv: {
+      atual: normalizeResourceNumber(source.vidaAtual ?? source.vida_atual ?? pv.atual ?? pv.current ?? source.hpAtual ?? source.hp_atual ?? source.pvAtual ?? source.pv_atual ?? 0),
+      maximo: normalizeResourceNumber(source.vidaMaxima ?? source.vida_maxima ?? pv.maximo ?? pv.max ?? source.hpMaxima ?? source.hp_maxima ?? source.pvMax ?? source.pv_max ?? 0)
+    },
+    pm: {
+      atual: normalizeResourceNumber(source.manaAtual ?? source.mana_atual ?? pm.atual ?? pm.current ?? source.mpAtual ?? source.mp_atual ?? source.pmAtual ?? source.pm_atual ?? 0),
+      maximo: normalizeResourceNumber(source.manaMaxima ?? source.mana_maxima ?? pm.maximo ?? pm.max ?? source.mpMaxima ?? source.mp_maxima ?? source.pmMax ?? source.pm_max ?? 0)
+    },
+    pf: {
+      atual: normalizeResourceNumber(source.pfAtual ?? source.pf_atual ?? pf.atual ?? pf.current ?? source.destinoAtual ?? source.destino_atual ?? 0),
+      maximo: normalizeResourceNumber(source.pfMaximo ?? source.pf_maximo ?? pf.maximo ?? pf.max ?? source.destinoMaximo ?? source.destino_maximo ?? 0)
+    }
+  };
 }
 
 function renderPlayerResourceBar(label, recurso, tone) {
@@ -1544,7 +1578,12 @@ function resumoFicha(ficha) {
   const personagem = ficha.personagem || {};
   const identidade = personagem.identidade || {};
   const combate = personagem.combate || {};
-  const recursosFicha = ficha.recursos || personagem.recursos || {};
+  const recursosFicha = normalizeResourceMap({
+    ...(ficha.recursos || {}),
+    ...(personagem.recursos || {}),
+    ...(ficha || {}),
+    ...(personagem || {})
+  });
   const lacos = Array.isArray(personagem.lacos) && personagem.lacos.length
     ? personagem.lacos.slice(0, 3)
     : Array.isArray(personagem.memorias) ? personagem.memorias.slice(0, 3) : [];
@@ -1696,22 +1735,18 @@ function fromRow(row, options = {}) {
   const personagem = row.personagem || {};
   const mode = options.mode || "full";
   const isPublicMode = mode === "public";
-  const resourceData = row.recursos || personagem.recursos || {};
+  const resourceData = normalizeResourceMap({
+    ...(row.recursos || {}),
+    ...(personagem.recursos || {}),
+    ...(row || {}),
+    ...(personagem || {})
+  });
   const publicResources = {
-    pv: {
-      atual: Number(resourceData?.pv?.atual ?? resourceData?.pv?.current ?? resourceData?.hp?.atual ?? resourceData?.hp?.current ?? resourceData?.pv ?? resourceData?.hp ?? 0),
-      maximo: Number(resourceData?.pv?.maximo ?? resourceData?.pv?.max ?? resourceData?.hp?.maximo ?? resourceData?.hp?.max ?? resourceData?.pvMax ?? resourceData?.hpMax ?? 0)
-    },
-    pm: {
-      atual: Number(resourceData?.pm?.atual ?? resourceData?.pm?.current ?? resourceData?.mp?.atual ?? resourceData?.mp?.current ?? resourceData?.pm ?? resourceData?.mp ?? 0),
-      maximo: Number(resourceData?.pm?.maximo ?? resourceData?.pm?.max ?? resourceData?.mp?.maximo ?? resourceData?.mp?.max ?? resourceData?.pmMax ?? resourceData?.mpMax ?? 0)
-    },
-    pf: {
-      atual: Number(resourceData?.pf?.atual ?? resourceData?.pf?.current ?? resourceData?.destino?.atual ?? resourceData?.destino?.current ?? resourceData?.pontosDestino?.atual ?? resourceData?.pontosDestino?.current ?? resourceData?.pf ?? resourceData?.destino ?? resourceData?.pontosDestino ?? 0),
-      maximo: Number(resourceData?.pf?.maximo ?? resourceData?.pf?.max ?? resourceData?.destino?.maximo ?? resourceData?.destino?.max ?? resourceData?.pontosDestino?.maximo ?? resourceData?.pontosDestino?.max ?? resourceData?.pfMax ?? resourceData?.destinoMax ?? resourceData?.pontosDestinoMax ?? 0)
-    }
+    pv: { atual: resourceData.pv.atual, maximo: resourceData.pv.maximo },
+    pm: { atual: resourceData.pm.atual, maximo: resourceData.pm.maximo },
+    pf: { atual: resourceData.pf.atual, maximo: resourceData.pf.maximo }
   };
-  const normalizedResources = isPublicMode ? publicResources : { ...sheet.recursos, ...(personagem.recursos || resourceData || {}) };
+  const normalizedResources = isPublicMode ? publicResources : { ...sheet.recursos, ...(personagem.recursos || row.recursos || {}) };
   return {
     ...sheet,
     ...personagem,
