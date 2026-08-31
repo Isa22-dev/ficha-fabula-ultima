@@ -73,7 +73,9 @@ let fichaParaExcluirId = null;
 const selectedBookIds = new Set();
 let unsavedModalOpen = false;
 let drawerOpen = false;
+let playersPanelOpen = false;
 let permissionMode = "full";
+let statusChannel = null;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -221,7 +223,7 @@ function initDrawerMenu() {
 }
 
 function abrirConfiguracoes() {
-  if (!state) {
+  if (!state || !canEditSheet(state)) {
     toast("Abra uma ficha completa para acessar Configurações.", "danger");
     return;
   }
@@ -323,6 +325,8 @@ function bindEvents() {
   $("#deleteSelectedBooksBtn").addEventListener("click", abrirModalExclusaoSelecionadas);
   $("#cancelBookSelectionBtn").addEventListener("click", limparSelecaoBiblioteca);
   $("#openFullSheetBtn").addEventListener("click", abrirFichaSelecionadaCompleta);
+  $("#playersFloatBtn")?.addEventListener("click", togglePlayersPanel);
+  $("#playersCloseBtn")?.addEventListener("click", () => setPlayersPanelOpen(false));
   $("#addMemory").addEventListener("click", addMemory);
   $("#addEquipment").addEventListener("click", addEquipment);
   $("#addBond").addEventListener("click", addBond);
@@ -389,20 +393,27 @@ function updateWorkspaceState() {
   $("#sheet-editor-screen").classList.toggle("hidden", !editorVisible);
   $("#arcaneLibrary").classList.toggle("hidden", !libraryVisible);
   if (libraryVisible) $$(".nav-tab").forEach((item) => item.classList.toggle("active", item.id === "libraryNavBtn"));
+  $("#playersFloatBtn")?.classList.toggle("hidden", !hasUser);
+  if (!hasUser) setPlayersPanelOpen(false);
   $("#sheetForm").classList.toggle("hidden", !editorVisible || isPublicView);
   $("#publicSheetView").classList.toggle("hidden", !editorVisible || !isPublicView);
   $("#emptyState").classList.add("hidden");
   $("#saveBtnTop").disabled = !editorVisible || isPublicView;
   $("#newSheetBtn").disabled = !hasUser;
-  $("#deleteBtn").disabled = !editorVisible || !state?.id || isPublicView;
+  $("#deleteBtn").disabled = !editorVisible || !state?.id || !canEditSheet(state);
   $("#exportBtn").disabled = !hasSheet || isPublicView;
   $("#resetBtn").disabled = !hasSheet || isPublicView;
 }
 
-function isAdminUser() {
-  const role = user?.app_metadata?.role || user?.user_metadata?.role;
+function isGMUser() {
+  const rawRole = user?.app_metadata?.role ?? user?.user_metadata?.role ?? "";
+  const normalizedRole = String(rawRole).trim().toLowerCase();
   const isAdminFlag = user?.app_metadata?.is_admin ?? user?.user_metadata?.is_admin;
-  return role === "admin" || isAdminFlag === true;
+  return ["admin", "gm", "master", "mestre"].includes(normalizedRole) || isAdminFlag === true;
+}
+
+function isAdminUser() {
+  return isGMUser();
 }
 
 function isCampaignViewContext() {
@@ -412,11 +423,19 @@ function isCampaignViewContext() {
 
 function canAccessCompleteSheet(ficha = state) {
   if (!user) return false;
-  if (isAdminUser()) return true;
+  if (isGMUser()) return true;
   const ownerId = ficha?.user_id || ficha?.owner_id;
   if (!ficha?.id && !ownerId) return true;
   const isOwner = ownerId === user.id;
   return Boolean(isOwner);
+}
+
+function canEditSheet(ficha = state) {
+  return canAccessCompleteSheet(ficha);
+}
+
+function canViewPublicStatus() {
+  return Boolean(user);
 }
 
 function shouldUsePublicView(ficha = state) {
@@ -691,14 +710,102 @@ async function logout() {
 async function refreshAuthState() {
   $("#authPanel").classList.toggle("hidden", Boolean(user));
   if (!user) {
+    removeStatusSubscription();
     clearActiveSheet();
     $("#bookGrid").innerHTML = "";
     $("#readingPanel").classList.add("hidden");
     updateWorkspaceState();
     return;
   }
+  await subscribeToStatusUpdates();
   await carregarBiblioteca();
   updateWorkspaceState();
+}
+
+async function subscribeToStatusUpdates() {
+  if (!db?.channel || statusChannel || !user) return;
+  try {
+    if (db.realtime?.setAuth) await db.realtime.setAuth();
+  } catch (error) {
+    console.warn("[realtime] não foi possível atualizar autenticação do canal:", error);
+  }
+  statusChannel = db
+    .channel("fichas-rpg-status", { config: { private: true } })
+    .on("broadcast", { event: "status_update" }, handleStatusBroadcast)
+    .subscribe((status, error) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        console.warn("[realtime] canal de status indisponível:", status, error);
+      }
+    });
+}
+
+function removeStatusSubscription() {
+  if (!statusChannel || !db?.removeChannel) {
+    statusChannel = null;
+    return;
+  }
+  db.removeChannel(statusChannel);
+  statusChannel = null;
+}
+
+function handleStatusBroadcast(message) {
+  if (!canViewPublicStatus()) return;
+  const payload = message?.payload || message;
+  const status = payload?.status || payload;
+  if (!status?.id) return;
+  if (payload?.operation === "DELETE") {
+    sheetList = sheetList.filter((ficha) => ficha.id !== status.id);
+    if (selectedLibraryId === status.id) {
+      selectedLibraryId = null;
+      fichaSelecionada = null;
+    }
+    renderizarLivros(sheetList);
+    renderPlayersResourcePanel();
+    return;
+  }
+  upsertPublicStatus(status);
+}
+
+function upsertPublicStatus(status) {
+  const index = sheetList.findIndex((ficha) => ficha.id === status.id);
+  const previous = index >= 0 ? sheetList[index] : {};
+  const next = mergePublicStatus(previous, status);
+  if (index >= 0) {
+    sheetList[index] = next;
+  } else {
+    sheetList.unshift(next);
+  }
+  if (fichaSelecionada?.id === status.id) {
+    fichaSelecionada = next;
+    preencherPainelLeitura(next);
+  }
+  if (state?.id === status.id && permissionMode === "public") {
+    state = fromRow(next, { mode: "public" });
+    renderPublicView();
+  }
+  renderPlayersResourcePanel();
+}
+
+function mergePublicStatus(previous, status) {
+  const recursos = status.recursos || previous.recursos || previous.personagem?.recursos || {};
+  return {
+    ...previous,
+    id: status.id,
+    user_id: status.user_id || previous.user_id || null,
+    nome: status.nome || previous.nome || previous.personagem?.identidade?.nome || "Ficha sem titulo",
+    retrato: status.retrato || status.imagem || previous.retrato || "",
+    updated_at: status.updated_at || previous.updated_at || null,
+    personagem: {
+      ...(previous.personagem || {}),
+      identidade: {
+        ...(previous.personagem?.identidade || {}),
+        nome: status.nome || previous.nome || previous.personagem?.identidade?.nome || "Ficha sem titulo",
+        retrato: status.retrato || status.imagem || previous.retrato || ""
+      },
+      recursos
+    },
+    recursos
+  };
 }
 
 async function salvarFicha(options = {}) {
@@ -707,7 +814,7 @@ async function salvarFicha(options = {}) {
     if (!silent) toast("Clique em Nova Ficha para começar.", "danger");
     return;
   }
-  if (permissionMode === "public") {
+  if (!canEditSheet(state)) {
     if (!silent) toast("Você não pode editar uma ficha de outro jogador.", "danger");
     return;
   }
@@ -763,6 +870,7 @@ async function encontrarFichaExistente() {
     .from("fichas_rpg")
     .select("id")
     .eq("personagem->>localId", state.localId)
+    .eq("user_id", user?.id)
     .maybeSingle();
   if (error) return null;
   return data?.id || null;
@@ -777,12 +885,7 @@ async function carregarFicha(id) {
   console.log("CHARACTER ID:", id);
 
   try {
-    const { data, error } = await db
-      .from("fichas_rpg")
-      .select("*")
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .single();
+    const { data, error } = await db.rpc("get_ficha_visivel", { p_ficha_id: id });
     console.log("CHARACTER DATA:", data);
     console.log("SUPABASE ERROR:", error);
 
@@ -797,7 +900,7 @@ async function carregarFicha(id) {
       return toast("Ficha não encontrada.", "danger");
     }
 
-    state = fromRow(row, { mode: shouldUsePublicView(row) ? "public" : "full" });
+    state = fromRow(row, { mode: row.modo === "publico" || shouldUsePublicView(row) ? "public" : "full" });
     selectedLibraryId = state.id;
     limparSelecaoBiblioteca(false);
     isDirty = false;
@@ -842,6 +945,10 @@ function abrirModalExclusao(id = state?.id) {
     console.error("Nenhuma ficha selecionada ou ID ausente.", ficha);
     return;
   }
+  if (!canEditSheet(ficha)) {
+    mostrarToast("Você não pode excluir uma ficha de outro jogador.");
+    return;
+  }
 
   pendingDeleteId = fichaId;
   pendingDeleteIds = [fichaId];
@@ -863,18 +970,29 @@ function abrirModalExclusaoSelecionadas() {
   console.log("IDs selecionados:", ids);
   console.log("Usuário logado:", user?.id);
 
-  if (!ids.length) return mostrarToast("Nenhuma ficha selecionada.");
-  if (ids.length === 1) {
-    abrirModalExclusao(ids[0]);
+  const allowedIds = ids.filter((id) => {
+    const ficha = sheetList.find((item) => item.id === id);
+    return ficha && canEditSheet(ficha);
+  });
+  if (allowedIds.length !== ids.length) {
+    selectedBookIds.clear();
+    allowedIds.forEach((id) => selectedBookIds.add(id));
+    atualizarBarraSelecaoBiblioteca();
+    renderizarLivros(sheetList);
+    return mostrarToast("Fichas de outros jogadores são somente leitura.");
+  }
+  if (!allowedIds.length) return mostrarToast("Nenhuma ficha selecionada.");
+  if (allowedIds.length === 1) {
+    abrirModalExclusao(allowedIds[0]);
     return;
   }
 
   pendingDeleteId = null;
-  pendingDeleteIds = ids;
+  pendingDeleteIds = allowedIds;
   fichaParaExcluirId = null;
   deleteModalOpen = true;
   const modal = $("#deleteModal");
-  const count = ids.length;
+  const count = allowedIds.length;
   $("#deleteModalTitle").textContent = "Excluir Fichas";
   $("#deleteModalMessage").textContent = `Deseja realmente excluir ${count} ${count === 1 ? "ficha selecionada" : "fichas selecionadas"}? Esta ação não poderá ser desfeita.`;
   $("#confirmDeleteBtn").textContent = "EXCLUIR";
@@ -1095,12 +1213,8 @@ async function listarFichas() {
 
   console.log("[diagnostico] listar fichas: user=", user?.id);
   try {
-    const { data, error } = await db
-      .from("fichas_rpg")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("updated_at", { ascending: false });
-    console.log("[diagnostico] Supabase select fichas proprias resposta:", { data, error });
+    const { data, error } = await db.rpc("listar_fichas_visiveis");
+    console.log("[diagnostico] Supabase select fichas da mesa resposta:", { data, error });
     if (error) {
       throw error;
     }
@@ -1109,10 +1223,12 @@ async function listarFichas() {
     sheetList = filtrarFichasPersistidas(rows);
     if (!sheetList.length) {
       renderizarLivros([]);
+      renderPlayersResourcePanel();
       if (!state?.id) clearActiveSheet();
       return sheetList;
     }
     renderizarLivros(sheetList);
+    renderPlayersResourcePanel();
     updateWorkspaceState();
     return sheetList;
   } catch (error) {
@@ -1143,25 +1259,27 @@ async function renderizarLivros(fichas) {
     const nivel = ficha.nivel || personagem.identidade?.nivel || 1;
     const tema = ficha.tema || personagem.identidade?.tema || "Tema oculto";
     const isChecked = selectedBookIds.has(ficha.id);
+    const isOwner = isFichaDoUsuario(ficha);
+    const canManage = canEditSheet(ficha);
     return `
       <article class="arcane-book ${selectedLibraryId === ficha.id ? "selected" : ""} ${isChecked ? "multi-selected" : ""}" data-id="${ficha.id}" style="animation-delay:${Math.min(index * 45, 360)}ms">
         <span class="book-rune"><i class="ti ti-book-2"></i></span>
         <span class="book-title">
           <strong>${escapeHtml(nome)}</strong>
-          <span>${escapeHtml(classe)}</span>
+          <span>${isOwner ? escapeHtml(classe) : "Recursos públicos"}</span>
         </span>
         <span class="book-meta">
-          <span>Nv. ${escapeHtml(nivel)}</span>
-          <span>${escapeHtml(tema)}</span>
+          <span>${isOwner ? `Nv. ${escapeHtml(nivel)}` : "Outro jogador"}</span>
+          <span>${isOwner ? escapeHtml(tema) : "PV / PM / PF"}</span>
         </span>
         <span class="book-actions">
           <button class="book-open-button" type="button" data-open-book="${ficha.id}" aria-label="Abrir ficha ${escapeHtml(nome)}">
-            <i class="ti ti-door-enter"></i>
-            <span>Abrir</span>
+            <i class="ti ${isOwner ? "ti-door-enter" : "ti-heart-bolt"}"></i>
+            <span>${isOwner ? "Abrir" : "Ver recursos"}</span>
           </button>
-          <button class="book-select-toggle" type="button" data-select-book="${ficha.id}" aria-label="Selecionar ${escapeHtml(nome)} para exclusão" aria-pressed="${isChecked}">
+          <button class="book-select-toggle" type="button" data-select-book="${ficha.id}" aria-label="Selecionar ${escapeHtml(nome)} para exclusão" aria-pressed="${isChecked}" ${canManage ? "" : "disabled"}>
             <i class="ti ${isChecked ? "ti-check" : "ti-square"}"></i>
-            <span>${isChecked ? "Selecionada" : "Selecionar"}</span>
+            <span>${canManage ? (isChecked ? "Selecionada" : "Selecionar") : "Somente leitura"}</span>
           </button>
         </span>
       </article>
@@ -1198,6 +1316,10 @@ function alternarSelecaoLivro(id) {
   if (!isUuid(id)) return;
   const ficha = sheetList.find((item) => item.id === id) || null;
   if (ficha) selecionarFicha(ficha);
+  if (ficha && !canEditSheet(ficha)) {
+    toast("Você não pode excluir uma ficha de outro jogador.", "danger");
+    return;
+  }
   if (selectedBookIds.has(id)) {
     selectedBookIds.delete(id);
   } else {
@@ -1322,7 +1444,7 @@ function preencherPainelLeitura(ficha) {
     return;
   }
   const resumo = resumoFicha(ficha);
-  const publicView = shouldUsePublicView(ficha);
+  const publicView = !isFichaDoUsuario(ficha);
   panel.classList.remove("hidden");
   $("#readingName").textContent = resumo.nome;
   $("#readingClass").textContent = publicView ? "Visualização" : resumo.classe;
@@ -1351,6 +1473,65 @@ function atualizarRecursoLeitura(label, recurso) {
   const percent = maximo > 0 ? Math.max(0, Math.min(100, Math.round((atual / maximo) * 100))) : 0;
   $(`#reading${label}Text`).textContent = `${atual}/${maximo}`;
   $(`#reading${label}Fill`).style.width = `${percent}%`;
+}
+
+function setPlayersPanelOpen(isOpen) {
+  const panel = $("#playersPanel");
+  const button = $("#playersFloatBtn");
+  if (!panel || !button) return;
+  playersPanelOpen = Boolean(isOpen);
+  renderPlayersResourcePanel();
+  panel.classList.toggle("open", playersPanelOpen);
+  button.classList.toggle("active", playersPanelOpen);
+  button.setAttribute("aria-expanded", String(playersPanelOpen));
+}
+
+function togglePlayersPanel() {
+  setPlayersPanelOpen(!playersPanelOpen);
+}
+
+function renderPlayersResourcePanel() {
+  const list = $("#playersResourceList");
+  if (!list) return;
+  if (!user) {
+    list.innerHTML = '<div class="players-empty">Entre para ver os recursos da mesa.</div>';
+    return;
+  }
+  const fichas = filtrarFichasPersistidas(sheetList);
+  if (!fichas.length) {
+    list.innerHTML = '<div class="players-empty">Nenhuma ficha cadastrada na mesa.</div>';
+    return;
+  }
+  list.innerHTML = fichas.map((ficha) => {
+    const resumo = resumoFicha(ficha);
+    const isOwner = isFichaDoUsuario(ficha);
+    return `
+      <article class="player-resource-card ${isOwner ? "owner" : ""}">
+        <div class="player-resource-head">
+          <strong>${escapeHtml(resumo.nome)}</strong>
+          <span>${isOwner ? "Você" : "Jogador"}</span>
+        </div>
+        <div class="player-resource-bars">
+          ${renderPlayerResourceBar("PV", resumo.pv, "pv")}
+          ${renderPlayerResourceBar("PM", resumo.pm, "pm")}
+          ${renderPlayerResourceBar("PF", resumo.pf, "pf")}
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderPlayerResourceBar(label, recurso, tone) {
+  const atual = Number(recurso?.atual || 0);
+  const maximo = Number(recurso?.maximo || 0);
+  const percent = maximo > 0 ? Math.max(0, Math.min(100, Math.round((atual / maximo) * 100))) : 0;
+  return `
+    <div class="player-resource-row">
+      <span>${label}</span>
+      <strong>${atual}/${maximo}</strong>
+      <div class="player-resource-track"><div class="player-resource-fill ${tone}" style="width:${percent}%"></div></div>
+    </div>
+  `;
 }
 
 async function abrirFichaSelecionadaCompleta() {
@@ -1638,8 +1819,8 @@ function renderPublicView() {
   }
   const portrait = state.retrato || "assets/images/portrait-placeholder.svg";
   const resources = [
-    { key: "pv", label: "HP", atual: state.recursos.pv?.atual ?? 0, maximo: state.recursos.pv?.maximo ?? 0 },
-    { key: "pm", label: "MP", atual: state.recursos.pm?.atual ?? 0, maximo: state.recursos.pm?.maximo ?? 0 },
+    { key: "pv", label: "Vida", atual: state.recursos.pv?.atual ?? 0, maximo: state.recursos.pv?.maximo ?? 0 },
+    { key: "pm", label: "Mana", atual: state.recursos.pm?.atual ?? 0, maximo: state.recursos.pm?.maximo ?? 0 },
     { key: "pf", label: "Pontos de Destino", atual: state.recursos.pf?.atual ?? 0, maximo: state.recursos.pf?.maximo ?? 0 }
   ];
   const visibleResources = resources.filter((resource) => resource.maximo > 0 || resource.atual > 0);
@@ -1655,8 +1836,8 @@ function renderPublicView() {
       </div>
       <section class="preview-panel">
         <h3>Recursos públicos</h3>
-        <div class="preview-stat-grid">
-          ${visibleResources.length ? visibleResources.map((resource) => `<div><span>${escapeHtml(resource.label)}</span><strong>${resource.atual}/${resource.maximo}</strong></div>`).join("") : '<div><span>Recursos</span><strong>Nenhum recurso público configurado</strong></div>'}
+        <div class="public-resource-list">
+          ${visibleResources.length ? visibleResources.map((resource) => renderPlayerResourceBar(resource.label, resource, resource.key)).join("") : '<div class="players-empty">Nenhum recurso público configurado.</div>'}
         </div>
       </section>
     </div>

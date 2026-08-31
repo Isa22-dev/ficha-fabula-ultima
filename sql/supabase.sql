@@ -38,9 +38,30 @@ set search_path = public
 as $$
 select
   coalesce((auth.jwt() -> 'app_metadata' ->> 'is_admin')::boolean, false)
-  or coalesce((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin', false)
+  or lower(coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '')) in ('admin', 'gm', 'master', 'mestre')
   or coalesce((auth.jwt() -> 'user_metadata' ->> 'is_admin')::boolean, false)
-  or coalesce((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin', false);
+  or lower(coalesce(auth.jwt() -> 'user_metadata' ->> 'role', '')) in ('admin', 'gm', 'master', 'mestre');
+$$;
+
+create or replace function public.ficha_status_publico(p_ficha public.fichas_rpg)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'id', p_ficha.id,
+    'nome', coalesce(p_ficha.nome, p_ficha.personagem->'identidade'->>'nome', 'Ficha sem titulo'),
+    'retrato', coalesce(p_ficha.retrato, p_ficha.personagem->'identidade'->>'retrato', ''),
+    'imagem', coalesce(p_ficha.retrato, p_ficha.personagem->'identidade'->>'retrato', ''),
+    'vidaAtual', coalesce((p_ficha.personagem->'recursos'->'pv'->>'atual')::integer, 0),
+    'vidaMaxima', coalesce((p_ficha.personagem->'recursos'->'pv'->>'maximo')::integer, 0),
+    'manaAtual', coalesce((p_ficha.personagem->'recursos'->'pm'->>'atual')::integer, 0),
+    'manaMaxima', coalesce((p_ficha.personagem->'recursos'->'pm'->>'maximo')::integer, 0),
+    'recursos', coalesce(p_ficha.personagem->'recursos', '{}'::jsonb),
+    'updated_at', p_ficha.updated_at
+  );
 $$;
 
 create or replace function public.get_ficha_visivel(p_ficha_id uuid)
@@ -64,15 +85,7 @@ begin
     return to_jsonb(v_ficha);
   end if;
 
-  return jsonb_build_object(
-    'id', v_ficha.id,
-    'user_id', v_ficha.user_id,
-    'nome', v_ficha.nome,
-    'retrato', v_ficha.retrato,
-    'imagem', v_ficha.retrato,
-    'modo', 'publico',
-    'recursos', coalesce(v_ficha.personagem->'recursos', '{}'::jsonb)
-  );
+  return public.ficha_status_publico(v_ficha) || jsonb_build_object('modo', 'publico');
 end;
 $$;
 
@@ -100,17 +113,20 @@ begin
   return query
   select
     f.id,
-    f.user_id,
+    case when v_user_id = f.user_id or v_is_admin then f.user_id else null end as user_id,
     f.nome,
     case when v_user_id = f.user_id or v_is_admin then f.classe else null end as classe,
     case when v_user_id = f.user_id or v_is_admin then f.nivel else null end as nivel,
     case when v_user_id = f.user_id or v_is_admin then f.tema else null end as tema,
     case when v_user_id = f.user_id or v_is_admin then f.origem else null end as origem,
-    case when v_user_id = f.user_id or v_is_admin then f.retrato else null end as retrato,
+    coalesce(f.retrato, f.personagem->'identidade'->>'retrato', '') as retrato,
     case
       when v_user_id = f.user_id or v_is_admin then f.personagem
       else jsonb_build_object(
-        'identidade', jsonb_build_object('nome', f.nome),
+        'identidade', jsonb_build_object(
+          'nome', coalesce(f.nome, f.personagem->'identidade'->>'nome', 'Ficha sem titulo'),
+          'retrato', coalesce(f.retrato, f.personagem->'identidade'->>'retrato', '')
+        ),
         'recursos', coalesce(f.personagem->'recursos', '{}'::jsonb)
       )
     end as personagem,
@@ -123,6 +139,51 @@ $$;
 grant execute on function public.is_admin_user() to authenticated;
 grant execute on function public.get_ficha_visivel(uuid) to authenticated;
 grant execute on function public.listar_fichas_visiveis() to authenticated;
+revoke execute on function public.ficha_status_publico(public.fichas_rpg) from public, authenticated;
+
+create or replace function public.broadcast_ficha_status()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, realtime
+as $$
+declare
+  v_ficha public.fichas_rpg;
+begin
+  if TG_OP = 'DELETE' then
+    v_ficha := old;
+  else
+    v_ficha := new;
+  end if;
+
+  perform realtime.send(
+    jsonb_build_object(
+      'operation', TG_OP,
+      'status', public.ficha_status_publico(v_ficha)
+    ),
+    'status_update',
+    'fichas-rpg-status',
+    true
+  );
+
+  return null;
+end;
+$$;
+
+drop trigger if exists broadcast_fichas_rpg_status on public.fichas_rpg;
+
+create trigger broadcast_fichas_rpg_status
+after insert or update or delete on public.fichas_rpg
+for each row
+execute function public.broadcast_ficha_status();
+
+drop policy if exists "authenticated can receive ficha status" on realtime.messages;
+
+create policy "authenticated can receive ficha status"
+on realtime.messages
+for select
+to authenticated
+using (true);
 
 drop trigger if exists set_fichas_rpg_updated_at on public.fichas_rpg;
 
@@ -140,12 +201,19 @@ drop policy if exists "update_own_fichas_rpg" on public.fichas_rpg;
 drop policy if exists "update_admin_fichas_rpg" on public.fichas_rpg;
 drop policy if exists "delete_own_fichas_rpg" on public.fichas_rpg;
 drop policy if exists "delete_admin_fichas_rpg" on public.fichas_rpg;
+drop policy if exists "select_all_fichas_rpg" on public.fichas_rpg;
 
-create policy "select_all_fichas_rpg"
+create policy "select_own_fichas_rpg"
 on public.fichas_rpg
 for select
 to authenticated
-using (true);
+using (auth.uid() = user_id);
+
+create policy "select_admin_fichas_rpg"
+on public.fichas_rpg
+for select
+to authenticated
+using (public.is_admin_user());
 
 create policy "insert_own_fichas_rpg"
 on public.fichas_rpg

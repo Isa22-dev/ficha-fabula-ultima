@@ -316,6 +316,24 @@
       <span class="session-float-label">Sessão</span>
     </button>
 
+    <button class="players-float-button" id="playersFloatBtn" type="button" title="Ver recursos dos jogadores" aria-expanded="false" aria-controls="playersPanel">
+      <i class="ti ti-users"></i>
+      <span class="session-float-label">Jogadores</span>
+    </button>
+
+    <aside class="players-panel" id="playersPanel" role="dialog" aria-label="Recursos dos jogadores">
+      <div class="players-panel-header">
+        <div>
+          <p class="eyebrow">Mesa</p>
+          <h2>Recursos dos jogadores</h2>
+        </div>
+        <button class="session-close-btn" id="playersCloseBtn" type="button" title="Fechar painel">
+          <i class="ti ti-x"></i>
+        </button>
+      </div>
+      <div class="players-list" id="playersResourceList"></div>
+    </aside>
+
     <!-- Painel Flutuante -->
     <aside class="session-panel" id="sessionPanel" role="dialog" aria-label="Painel de Sessão">
       <div class="session-panel-header">
