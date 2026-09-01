@@ -1,0 +1,598 @@
+-- Copie TUDO abaixo, vá em https://app.supabase.com
+-- Clique no seu projeto → SQL Editor → "New Query"
+-- Cole tudo isso e clique RUN
+
+create extension if not exists pgcrypto;
+
+create table if not exists public.fichas_rpg (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
+  nome text,
+  classe text,
+  nivel integer default 1,
+  tema text,
+  origem text,
+  personagem jsonb not null default '{}'::jsonb,
+  retrato text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists fichas_rpg_user_id_idx on public.fichas_rpg(user_id);
+create index if not exists fichas_rpg_updated_at_idx on public.fichas_rpg(updated_at desc);
+create index if not exists fichas_rpg_local_id_idx on public.fichas_rpg((personagem->>'localId'));
+
+create table if not exists public.campanhas_rpg (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null,
+  descricao text,
+  mestre_id uuid not null references auth.users(id) on delete cascade,
+  status text not null default 'ativa' check (status in ('ativa', 'pausada', 'encerrada')),
+  configuracao jsonb not null default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists campanhas_rpg_mestre_id_idx on public.campanhas_rpg(mestre_id);
+create index if not exists campanhas_rpg_updated_at_idx on public.campanhas_rpg(updated_at desc);
+
+create table if not exists public.campanha_membros (
+  id uuid primary key default gen_random_uuid(),
+  campanha_id uuid not null references public.campanhas_rpg(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  ficha_id uuid references public.fichas_rpg(id) on delete set null,
+  papel text not null default 'jogador' check (papel in ('mestre', 'jogador', 'observador')),
+  status text not null default 'ativo' check (status in ('ativo', 'inativo', 'pendente')),
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (campanha_id, user_id)
+);
+
+create index if not exists campanha_membros_campanha_id_idx on public.campanha_membros(campanha_id);
+create index if not exists campanha_membros_user_id_idx on public.campanha_membros(user_id);
+create index if not exists campanha_membros_ficha_id_idx on public.campanha_membros(ficha_id);
+
+create or replace function public.user_is_campanha_membro(p_campanha_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.campanha_membros cm
+    where cm.campanha_id = p_campanha_id
+      and cm.user_id = auth.uid()
+      and cm.status = 'ativo'
+  );
+$$;
+
+create or replace function public.listar_campanhas_usuario()
+returns table (
+  id uuid,
+  nome text,
+  descricao text,
+  mestre_id uuid,
+  status text,
+  configuracao jsonb,
+  created_at timestamptz,
+  updated_at timestamptz,
+  papel text,
+  is_mestre boolean
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return query
+  select
+    c.id,
+    c.nome,
+    c.descricao,
+    c.mestre_id,
+    c.status,
+    c.configuracao,
+    c.created_at,
+    c.updated_at,
+    cm.papel,
+    (c.mestre_id = auth.uid()) as is_mestre
+  from public.campanhas_rpg c
+  join public.campanha_membros cm on cm.campanha_id = c.id
+  where cm.user_id = auth.uid()
+    and cm.status = 'ativo'
+  order by c.updated_at desc;
+end;
+$$;
+
+create or replace function public.listar_membros_campanha(p_campanha_id uuid)
+returns table (
+  id uuid,
+  campanha_id uuid,
+  user_id uuid,
+  ficha_id uuid,
+  papel text,
+  status text,
+  metadata jsonb,
+  created_at timestamptz,
+  updated_at timestamptz,
+  nome text,
+  classe text,
+  nivel integer,
+  retrato text
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return query
+  select
+    cm.id,
+    cm.campanha_id,
+    cm.user_id,
+    cm.ficha_id,
+    cm.papel,
+    cm.status,
+    cm.metadata,
+    cm.created_at,
+    cm.updated_at,
+    coalesce(f.nome, f.personagem->'identidade'->>'nome', 'Ficha sem titulo') as nome,
+    coalesce(f.classe, f.personagem->'identidade'->>'classe', '') as classe,
+    coalesce(f.nivel, (f.personagem->'identidade'->>'nivel')::integer, 1) as nivel,
+    coalesce(f.retrato, f.personagem->'identidade'->>'retrato', '') as retrato
+  from public.campanha_membros cm
+  left join public.fichas_rpg f on f.id = cm.ficha_id
+  where cm.campanha_id = p_campanha_id
+  order by cm.created_at asc;
+end;
+$$;
+
+create or replace function public.listar_fichas_campanha(p_campanha_id uuid)
+returns table (
+  id uuid,
+  user_id uuid,
+  nome text,
+  classe text,
+  nivel integer,
+  tema text,
+  origem text,
+  retrato text,
+  personagem jsonb,
+  updated_at timestamptz,
+  papel text,
+  is_mestre boolean
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return query
+  select
+    f.id,
+    f.user_id,
+    coalesce(f.nome, f.personagem->'identidade'->>'nome', 'Ficha sem titulo') as nome,
+    coalesce(f.classe, f.personagem->'identidade'->>'classe', '') as classe,
+    coalesce(f.nivel, (f.personagem->'identidade'->>'nivel')::integer, 1) as nivel,
+    coalesce(f.tema, f.personagem->'identidade'->>'tema', '') as tema,
+    coalesce(f.origem, f.personagem->'identidade'->>'origem', '') as origem,
+    coalesce(f.retrato, f.personagem->'identidade'->>'retrato', '') as retrato,
+    case
+      when f.user_id = auth.uid() or public.is_admin_user() then f.personagem
+      else jsonb_build_object(
+        'identidade', jsonb_build_object(
+          'nome', coalesce(f.nome, f.personagem->'identidade'->>'nome', 'Ficha sem titulo'),
+          'retrato', coalesce(f.retrato, f.personagem->'identidade'->>'retrato', '')
+        ),
+        'recursos', coalesce(f.personagem->'recursos', '{}'::jsonb)
+      )
+    end as personagem,
+    f.updated_at,
+    cm.papel,
+    (c.mestre_id = auth.uid()) as is_mestre
+  from public.campanha_membros cm
+  join public.campanhas_rpg c on c.id = cm.campanha_id
+  join public.fichas_rpg f on f.id = cm.ficha_id
+  where cm.campanha_id = p_campanha_id
+    and cm.status = 'ativo'
+    and (cm.user_id = auth.uid() or c.mestre_id = auth.uid() or public.is_admin_user())
+  order by f.updated_at desc;
+end;
+$$;
+
+grant execute on function public.user_is_campanha_membro(uuid) to authenticated;
+grant execute on function public.listar_campanhas_usuario() to authenticated;
+grant execute on function public.listar_membros_campanha(uuid) to authenticated;
+grant execute on function public.listar_fichas_campanha(uuid) to authenticated;
+
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create or replace function public.is_admin_user()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+select
+  coalesce((auth.jwt() -> 'app_metadata' ->> 'is_admin')::boolean, false)
+  or lower(coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '')) in ('admin', 'gm', 'master', 'mestre')
+  or coalesce((auth.jwt() -> 'user_metadata' ->> 'is_admin')::boolean, false)
+  or lower(coalesce(auth.jwt() -> 'user_metadata' ->> 'role', '')) in ('admin', 'gm', 'master', 'mestre');
+$$;
+
+create or replace function public.ficha_status_publico(p_ficha public.fichas_rpg)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'id', p_ficha.id,
+    'nome', coalesce(p_ficha.nome, p_ficha.personagem->'identidade'->>'nome', 'Ficha sem titulo'),
+    'retrato', coalesce(p_ficha.retrato, p_ficha.personagem->'identidade'->>'retrato', ''),
+    'imagem', coalesce(p_ficha.retrato, p_ficha.personagem->'identidade'->>'retrato', ''),
+    'vidaAtual', coalesce((p_ficha.personagem->'recursos'->'pv'->>'atual')::integer, 0),
+    'vidaMaxima', coalesce((p_ficha.personagem->'recursos'->'pv'->>'maximo')::integer, 0),
+    'manaAtual', coalesce((p_ficha.personagem->'recursos'->'pm'->>'atual')::integer, 0),
+    'manaMaxima', coalesce((p_ficha.personagem->'recursos'->'pm'->>'maximo')::integer, 0),
+    'recursos', coalesce(p_ficha.personagem->'recursos', '{}'::jsonb),
+    'updated_at', p_ficha.updated_at
+  );
+$$;
+
+create or replace function public.get_ficha_visivel(p_ficha_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ficha public.fichas_rpg;
+  v_user_id uuid := auth.uid();
+  v_is_admin boolean := public.is_admin_user();
+begin
+  select * into v_ficha from public.fichas_rpg where id = p_ficha_id;
+
+  if not found then
+    return jsonb_build_object('id', p_ficha_id, 'nome', 'Ficha não encontrada', 'modo', 'publico', 'recursos', '{}'::jsonb);
+  end if;
+
+  if v_user_id = v_ficha.user_id or v_is_admin then
+    return to_jsonb(v_ficha);
+  end if;
+
+  return public.ficha_status_publico(v_ficha) || jsonb_build_object('modo', 'publico');
+end;
+$$;
+
+create or replace function public.listar_fichas_visiveis()
+returns table (
+  id uuid,
+  user_id uuid,
+  nome text,
+  classe text,
+  nivel integer,
+  tema text,
+  origem text,
+  retrato text,
+  personagem jsonb,
+  updated_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_is_admin boolean := public.is_admin_user();
+begin
+  return query
+  select
+    f.id,
+    case when v_user_id = f.user_id or v_is_admin then f.user_id else null end as user_id,
+    f.nome,
+    case when v_user_id = f.user_id or v_is_admin then f.classe else null end as classe,
+    case when v_user_id = f.user_id or v_is_admin then f.nivel else null end as nivel,
+    case when v_user_id = f.user_id or v_is_admin then f.tema else null end as tema,
+    case when v_user_id = f.user_id or v_is_admin then f.origem else null end as origem,
+    coalesce(f.retrato, f.personagem->'identidade'->>'retrato', '') as retrato,
+    case
+      when v_user_id = f.user_id or v_is_admin then f.personagem
+      else jsonb_build_object(
+        'identidade', jsonb_build_object(
+          'nome', coalesce(f.nome, f.personagem->'identidade'->>'nome', 'Ficha sem titulo'),
+          'retrato', coalesce(f.retrato, f.personagem->'identidade'->>'retrato', '')
+        ),
+        'recursos', coalesce(f.personagem->'recursos', '{}'::jsonb)
+      )
+    end as personagem,
+    f.updated_at
+  from public.fichas_rpg f
+  order by f.updated_at desc;
+end;
+$$;
+
+grant execute on function public.is_admin_user() to authenticated;
+grant execute on function public.get_ficha_visivel(uuid) to authenticated;
+grant execute on function public.listar_fichas_visiveis() to authenticated;
+revoke execute on function public.ficha_status_publico(public.fichas_rpg) from public, authenticated;
+
+create or replace function public.broadcast_ficha_status()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, realtime
+as $$
+declare
+  v_ficha public.fichas_rpg;
+begin
+  if TG_OP = 'DELETE' then
+    v_ficha := old;
+  else
+    v_ficha := new;
+  end if;
+
+  perform realtime.send(
+    jsonb_build_object(
+      'operation', TG_OP,
+      'status', public.ficha_status_publico(v_ficha)
+    ),
+    'status_update',
+    'fichas-rpg-status',
+    true
+  );
+
+  return null;
+end;
+$$;
+
+drop trigger if exists broadcast_fichas_rpg_status on public.fichas_rpg;
+
+create trigger broadcast_fichas_rpg_status
+after insert or update or delete on public.fichas_rpg
+for each row
+execute function public.broadcast_ficha_status();
+
+drop policy if exists "authenticated can receive ficha status" on realtime.messages;
+
+create policy "authenticated can receive ficha status"
+on realtime.messages
+for select
+to authenticated
+using (true);
+
+drop trigger if exists set_fichas_rpg_updated_at on public.fichas_rpg;
+
+create trigger set_fichas_rpg_updated_at
+before update on public.fichas_rpg
+for each row
+execute function public.set_updated_at();
+
+alter table public.fichas_rpg enable row level security;
+
+drop policy if exists "select_own_fichas_rpg" on public.fichas_rpg;
+drop policy if exists "select_admin_fichas_rpg" on public.fichas_rpg;
+drop policy if exists "insert_own_fichas_rpg" on public.fichas_rpg;
+drop policy if exists "update_own_fichas_rpg" on public.fichas_rpg;
+drop policy if exists "update_admin_fichas_rpg" on public.fichas_rpg;
+drop policy if exists "delete_own_fichas_rpg" on public.fichas_rpg;
+drop policy if exists "delete_admin_fichas_rpg" on public.fichas_rpg;
+drop policy if exists "select_all_fichas_rpg" on public.fichas_rpg;
+drop policy if exists "select_authenticated_fichas_rpg" on public.fichas_rpg;
+drop policy if exists "select_all_public_status_fichas_rpg" on public.fichas_rpg;
+
+create policy "select_authenticated_fichas_rpg"
+on public.fichas_rpg
+for select
+to authenticated
+using (true);
+
+create policy "insert_own_fichas_rpg"
+on public.fichas_rpg
+for insert
+to authenticated
+with check (auth.uid() = user_id);
+
+create policy "update_own_fichas_rpg"
+on public.fichas_rpg
+for update
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create policy "update_admin_fichas_rpg"
+on public.fichas_rpg
+for update
+to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
+
+create policy "delete_own_fichas_rpg"
+on public.fichas_rpg
+for delete
+to authenticated
+using (auth.uid() = user_id);
+
+create policy "delete_admin_fichas_rpg"
+on public.fichas_rpg
+for delete
+to authenticated
+using (public.is_admin_user());
+
+-- Tabela de Anotações de Sessão
+create table if not exists public.anotacoes_sessao (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
+  conteudo text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists anotacoes_sessao_user_id_idx on public.anotacoes_sessao(user_id);
+create index if not exists anotacoes_sessao_updated_at_idx on public.anotacoes_sessao(updated_at desc);
+
+drop trigger if exists set_anotacoes_sessao_updated_at on public.anotacoes_sessao;
+
+create trigger set_anotacoes_sessao_updated_at
+before update on public.anotacoes_sessao
+for each row
+execute function public.set_updated_at();
+
+alter table public.anotacoes_sessao enable row level security;
+
+drop trigger if exists set_campanhas_rpg_updated_at on public.campanhas_rpg;
+create trigger set_campanhas_rpg_updated_at
+before update on public.campanhas_rpg
+for each row
+execute function public.set_updated_at();
+
+alter table public.campanhas_rpg enable row level security;
+
+drop policy if exists "select_own_campanhas_rpg" on public.campanhas_rpg;
+drop policy if exists "insert_own_campanhas_rpg" on public.campanhas_rpg;
+drop policy if exists "update_own_campanhas_rpg" on public.campanhas_rpg;
+drop policy if exists "delete_own_campanhas_rpg" on public.campanhas_rpg;
+create policy "select_own_campanhas_rpg"
+on public.campanhas_rpg
+for select
+to authenticated
+using (mestre_id = auth.uid() or exists (
+  select 1 from public.campanha_membros cm
+  where cm.campanha_id = public.campanhas_rpg.id and cm.user_id = auth.uid() and cm.status = 'ativo'
+));
+
+create policy "insert_own_campanhas_rpg"
+on public.campanhas_rpg
+for insert
+to authenticated
+with check (mestre_id = auth.uid());
+
+create policy "update_own_campanhas_rpg"
+on public.campanhas_rpg
+for update
+to authenticated
+using (mestre_id = auth.uid())
+with check (mestre_id = auth.uid());
+
+create policy "delete_own_campanhas_rpg"
+on public.campanhas_rpg
+for delete
+to authenticated
+using (mestre_id = auth.uid());
+
+drop trigger if exists set_campanha_membros_updated_at on public.campanha_membros;
+create trigger set_campanha_membros_updated_at
+before update on public.campanha_membros
+for each row
+execute function public.set_updated_at();
+
+alter table public.campanha_membros enable row level security;
+
+drop policy if exists "select_own_campanha_membros" on public.campanha_membros;
+drop policy if exists "insert_own_campanha_membros" on public.campanha_membros;
+drop policy if exists "update_own_campanha_membros" on public.campanha_membros;
+drop policy if exists "delete_own_campanha_membros" on public.campanha_membros;
+
+create policy "select_own_campanha_membros"
+on public.campanha_membros
+for select
+to authenticated
+using (
+  user_id = auth.uid()
+  or exists (
+    select 1 from public.campanhas_rpg c
+    where c.id = campanha_id and c.mestre_id = auth.uid()
+  )
+  or public.is_admin_user()
+);
+
+create policy "insert_own_campanha_membros"
+on public.campanha_membros
+for insert
+to authenticated
+with check (
+  user_id = auth.uid()
+  or exists (
+    select 1 from public.campanhas_rpg c
+    where c.id = campanha_id and c.mestre_id = auth.uid()
+  )
+  or public.is_admin_user()
+);
+
+create policy "update_own_campanha_membros"
+on public.campanha_membros
+for update
+to authenticated
+using (
+  user_id = auth.uid()
+  or exists (
+    select 1 from public.campanhas_rpg c
+    where c.id = campanha_id and c.mestre_id = auth.uid()
+  )
+  or public.is_admin_user()
+)
+with check (
+  user_id = auth.uid()
+  or exists (
+    select 1 from public.campanhas_rpg c
+    where c.id = campanha_id and c.mestre_id = auth.uid()
+  )
+  or public.is_admin_user()
+);
+
+create policy "delete_own_campanha_membros"
+on public.campanha_membros
+for delete
+to authenticated
+using (
+  user_id = auth.uid()
+  or exists (
+    select 1 from public.campanhas_rpg c
+    where c.id = campanha_id and c.mestre_id = auth.uid()
+  )
+  or public.is_admin_user()
+);
+
+drop policy if exists "select_own_anotacoes_sessao" on public.anotacoes_sessao;
+drop policy if exists "insert_own_anotacoes_sessao" on public.anotacoes_sessao;
+drop policy if exists "update_own_anotacoes_sessao" on public.anotacoes_sessao;
+drop policy if exists "delete_own_anotacoes_sessao" on public.anotacoes_sessao;
+
+create policy "select_own_anotacoes_sessao"
+on public.anotacoes_sessao
+for select
+to authenticated
+using (auth.uid() = user_id);
+
+create policy "insert_own_anotacoes_sessao"
+on public.anotacoes_sessao
+for insert
+to authenticated
+with check (auth.uid() = user_id);
+
+create policy "update_own_anotacoes_sessao"
+on public.anotacoes_sessao
+for update
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create policy "delete_own_anotacoes_sessao"
+on public.anotacoes_sessao
+for delete
+to authenticated
+using (auth.uid() = user_id);
