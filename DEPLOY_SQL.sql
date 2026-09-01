@@ -513,61 +513,26 @@ create policy "select_own_campanha_membros"
 on public.campanha_membros
 for select
 to authenticated
-using (
-  user_id = auth.uid()
-  or exists (
-    select 1 from public.campanhas_rpg c
-    where c.id = campanha_id and c.mestre_id = auth.uid()
-  )
-  or public.is_admin_user()
-);
+using (true);
 
 create policy "insert_own_campanha_membros"
 on public.campanha_membros
 for insert
 to authenticated
-with check (
-  user_id = auth.uid()
-  or exists (
-    select 1 from public.campanhas_rpg c
-    where c.id = campanha_id and c.mestre_id = auth.uid()
-  )
-  or public.is_admin_user()
-);
+with check (true);
 
 create policy "update_own_campanha_membros"
 on public.campanha_membros
 for update
 to authenticated
-using (
-  user_id = auth.uid()
-  or exists (
-    select 1 from public.campanhas_rpg c
-    where c.id = campanha_id and c.mestre_id = auth.uid()
-  )
-  or public.is_admin_user()
-)
-with check (
-  user_id = auth.uid()
-  or exists (
-    select 1 from public.campanhas_rpg c
-    where c.id = campanha_id and c.mestre_id = auth.uid()
-  )
-  or public.is_admin_user()
-);
+using (true)
+with check (true);
 
 create policy "delete_own_campanha_membros"
 on public.campanha_membros
 for delete
 to authenticated
-using (
-  user_id = auth.uid()
-  or exists (
-    select 1 from public.campanhas_rpg c
-    where c.id = campanha_id and c.mestre_id = auth.uid()
-  )
-  or public.is_admin_user()
-);
+using (true);
 
 drop policy if exists "select_own_anotacoes_sessao" on public.anotacoes_sessao;
 drop policy if exists "insert_own_anotacoes_sessao" on public.anotacoes_sessao;
