@@ -215,6 +215,12 @@ for select
 to authenticated
 using (public.is_admin_user());
 
+create policy "select_all_public_status_fichas_rpg"
+on public.fichas_rpg
+for select
+to authenticated
+using (auth.uid() is not null);
+
 create policy "insert_own_fichas_rpg"
 on public.fichas_rpg
 for insert
