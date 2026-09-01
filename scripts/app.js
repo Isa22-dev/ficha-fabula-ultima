@@ -76,6 +76,12 @@ let drawerOpen = false;
 let playersPanelOpen = false;
 let permissionMode = "full";
 let statusChannel = null;
+let campaignModalOpen = false;
+let inviteModalOpen = false;
+let campaignList = [];
+let selectedCampaignId = null;
+let currentEditingCampaignId = null;
+let showCampaignsPanel = false;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -331,6 +337,12 @@ function bindEvents() {
   $("#addEquipment").addEventListener("click", addEquipment);
   $("#addBond").addEventListener("click", addBond);
   $("#clearRollHistory").addEventListener("click", limparHistoricoDados);
+  $("#campaignsPanelBtn")?.addEventListener("click", toggleCampaignsPanel);
+  $("#newCampaignBtn")?.addEventListener("click", abrirModalNovaCampanha);
+  $("#campaignForm")?.addEventListener("submit", salvarNovaCampanha);
+  $("#cancelCampaignBtn")?.addEventListener("click", fecharModalCampanha);
+  $("#inviteForm")?.addEventListener("submit", enviarConvite);
+  $("#cancelInviteBtn")?.addEventListener("click", fecharModalConvite);
 
   document.addEventListener("click", (event) => {
     const remove = event.target.closest("[data-remove]");
@@ -416,9 +428,15 @@ function isAdminUser() {
   return isGMUser();
 }
 
+function getCampaignIdFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("campaignId") || (params.get("campaign") && params.get("campaign") !== "1" && params.get("campaign") !== "true" ? params.get("campaign") : null);
+}
+
 function isCampaignViewContext() {
   const params = new URLSearchParams(window.location.search);
-  return params.get("campaign") === "1" || params.get("campaign") === "true";
+  const hasExplicitCampaign = Boolean(getCampaignIdFromQuery());
+  return hasExplicitCampaign || params.get("campaign") === "1" || params.get("campaign") === "true";
 }
 
 function canAccessCompleteSheet(ficha = state) {
@@ -1229,15 +1247,25 @@ async function listarFichas() {
   sheetList = [];
   if (!user) return [];
 
-  console.log("[diagnostico] listar fichas: user=", user?.id);
+  console.log("[diagnostico] listar fichas: user=", user?.id, "campaignId=", getCampaignIdFromQuery(), "campaignContext=", isCampaignViewContext());
   try {
     let rows = [];
     let error = null;
 
-    const rpcResult = await db.rpc("listar_fichas_visiveis");
-    rows = Array.isArray(rpcResult?.data) ? rpcResult.data : [];
-    error = rpcResult?.error || null;
-    console.log("[diagnostico] Supabase select fichas da mesa resposta:", { data: rows, error });
+    const campaignId = getCampaignIdFromQuery();
+    if (isCampaignViewContext() && campaignId) {
+      const campaignRpc = await db.rpc("listar_fichas_campanha", { p_campanha_id: campaignId });
+      rows = Array.isArray(campaignRpc?.data) ? campaignRpc.data : [];
+      error = campaignRpc?.error || null;
+      console.log("[diagnostico] listar fichas da campanha:", { data: rows, error });
+    }
+
+    if ((!isCampaignViewContext() || !campaignId) && !error) {
+      const rpcResult = await db.rpc("listar_fichas_visiveis");
+      rows = Array.isArray(rpcResult?.data) ? rpcResult.data : [];
+      error = rpcResult?.error || null;
+      console.log("[diagnostico] Supabase select fichas da mesa resposta:", { data: rows, error });
+    }
 
     if (error || !rows.length) {
       console.warn("[biblioteca] RPC falhou ou retornou vazio; carregando todas as fichas diretamente do banco para o painel e biblioteca:", error);
@@ -2241,6 +2269,301 @@ function escapeHtml(value = "") {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function toggleCampaignsPanel() {
+  showCampaignsPanel = !showCampaignsPanel;
+  const library = $("#arcaneLibrary");
+  const campaigns = $("#campaignsSection");
+  if (!library || !campaigns) return;
+  library.classList.toggle("hidden", showCampaignsPanel);
+  campaigns.classList.toggle("hidden", !showCampaignsPanel);
+  if (showCampaignsPanel) {
+    carregarCampanhas();
+  }
+}
+
+async function carregarCampanhas() {
+  if (!user) {
+    campaignList = [];
+    renderCampaigns();
+    return;
+  }
+  try {
+    setLoading(true);
+    const { data, error } = await db.rpc("listar_campanhas_usuario");
+    if (error) {
+      console.error("[campanhas] erro ao listar:", error);
+      toast("Erro ao carrega campanhas.", "danger");
+      return;
+    }
+    campaignList = Array.isArray(data) ? data : [];
+    console.log("[campanhas] carregadas:", campaignList.length, campaignList);
+    renderCampaigns();
+  } catch (error) {
+    console.error("[campanhas] erro inesperado:", error);
+    toast("Erro ao carregar campanhas.", "danger");
+  } finally {
+    setLoading(false);
+  }
+}
+
+function renderCampaigns() {
+  const grid = $("#campaignsGrid");
+  if (!grid) return;
+  if (!campaignList.length) {
+    grid.innerHTML = '<div class="library-empty"><h3>Nenhuma campanha encontrada.</h3><p>Clique em Nova Campanha para criar sua primeira mesa.</p></div>';
+    return;
+  }
+  grid.innerHTML = campaignList.map((campaign, index) => {
+    const isMestre = campaign.is_mestre || campaign.papel === "mestre";
+    return `
+      <article class="campaign-card" data-id="${campaign.id}" style="animation-delay:${Math.min(index * 45, 360)}ms">
+        <div class="campaign-header">
+          <h3>${escapeHtml(campaign.nome)}</h3>
+          <span class="campaign-badge ${campaign.status}">${campaign.status}</span>
+        </div>
+        <p class="campaign-desc">${escapeHtml(campaign.descricao?.substring(0, 100) || "Sem descrição")}</p>
+        <div class="campaign-footer">
+          <span class="campaign-role">${isMestre ? "Mestre" : "Jogador"}</span>
+          <div class="campaign-actions">
+            ${isMestre ? `<button class="ghost-button" type="button" data-invite-campaign="${campaign.id}" title="Convidar jogadores"><i class="ti ti-users-plus"></i></button>` : ""}
+            <button class="primary-button" type="button" data-join-campaign="${campaign.id}" title="Abrir campanha">
+              <i class="ti ti-door-enter"></i>Abrir
+            </button>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
+  
+  atualizarSeletorCampanha();
+  
+  document.querySelectorAll("[data-invite-campaign]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      selectedCampaignId = e.currentTarget.dataset.inviteCampaign;
+      abrirModalConvite();
+    });
+  });
+  
+  document.querySelectorAll("[data-join-campaign]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const campaignId = e.currentTarget.dataset.joinCampaign;
+      abrirCampanha(campaignId);
+    });
+  });
+}
+
+function atualizarSeletorCampanha() {
+  const selector = $("#campaignSelector");
+  const select = $("#campaignSelect");
+  if (!selector || !select) return;
+  
+  if (!campaignList.length) {
+    selector.classList.add("hidden");
+    return;
+  }
+  
+  const currentCampaignId = getCampaignIdFromQuery();
+  selector.classList.toggle("hidden", !currentCampaignId && campaignList.length === 0);
+  
+  select.innerHTML = '<option value="">Todas as fichas</option>' +
+    campaignList.map(c => `<option value="${c.id}" ${c.id === currentCampaignId ? "selected" : ""}>${escapeHtml(c.nome)}</option>`).join("");
+  
+  select.removeEventListener("change", handleCampaignSelectChange);
+  select.addEventListener("change", handleCampaignSelectChange);
+}
+
+function handleCampaignSelectChange(e) {
+  const campaignId = e.target.value;
+  if (!campaignId) {
+    const url = new URL(window.location);
+    url.searchParams.delete("campaignId");
+    window.history.pushState(null, "", url.toString());
+    selectedCampaignId = null;
+  } else {
+    abrirCampanha(campaignId);
+  }
+}
+
+function abrirModalNovaCampanha() {
+  currentEditingCampaignId = null;
+  const form = $("#campaignForm");
+  if (!form) return;
+  form.reset();
+  const title = $("#campaignModalTitle");
+  if (title) title.textContent = "Nova Campanha";
+  const modal = $("#campaignModal");
+  if (!modal) return;
+  campaignModalOpen = true;
+  modal.classList.remove("hidden", "closing");
+  $("#campaignName").focus();
+}
+
+function fecharModalCampanha() {
+  if (!campaignModalOpen) return;
+  campaignModalOpen = false;
+  const modal = $("#campaignModal");
+  if (!modal) return;
+  modal.classList.add("closing");
+  setTimeout(() => {
+    modal.classList.add("hidden");
+    modal.classList.remove("closing");
+  }, 180);
+}
+
+async function salvarNovaCampanha(event) {
+  event.preventDefault();
+  if (!user) {
+    toast("Entre para criar uma campanha.", "danger");
+    return;
+  }
+  const nome = $("#campaignName").value.trim();
+  const descricao = $("#campaignDescription").value.trim();
+  if (!nome) {
+    toast("Digite o nome da campanha.", "danger");
+    return;
+  }
+  try {
+    setLoading(true);
+    const { data, error } = await db
+      .from("campanhas_rpg")
+      .insert({
+        nome,
+        descricao,
+        mestre_id: user.id,
+        status: "ativa"
+      })
+      .select("id")
+      .single();
+    if (error) {
+      console.error("[campanha] erro ao criar:", error);
+      toast("Erro ao criar campanha.", "danger");
+      return;
+    }
+    const campaignId = data?.id;
+    const memberRes = await db
+      .from("campanha_membros")
+      .insert({
+        campanha_id: campaignId,
+        user_id: user.id,
+        papel: "mestre",
+        status: "ativo"
+      })
+      .select("id");
+    if (memberRes.error) {
+      console.error("[membro] erro ao criar:", memberRes.error);
+      toast("Campanha criada, mas não foi possível adicionar você como mestre.", "warning");
+    }
+    toast("Campanha criada com sucesso.");
+    fecharModalCampanha();
+    await carregarCampanhas();
+  } catch (error) {
+    console.error("[campanha] erro inesperado:", error);
+    toast("Erro ao criar campanha.", "danger");
+  } finally {
+    setLoading(false);
+  }
+}
+
+function abrirModalConvite() {
+  if (!selectedCampaignId) {
+    toast("Selecione uma campanha.", "danger");
+    return;
+  }
+  const form = $("#inviteForm");
+  if (!form) return;
+  form.reset();
+  const modal = $("#inviteModal");
+  if (!modal) return;
+  inviteModalOpen = true;
+  modal.classList.remove("hidden", "closing");
+  $("#inviteEmail").focus();
+}
+
+function fecharModalConvite() {
+  if (!inviteModalOpen) return;
+  inviteModalOpen = false;
+  const modal = $("#inviteModal");
+  if (!modal) return;
+  modal.classList.add("closing");
+  setTimeout(() => {
+    modal.classList.add("hidden");
+    modal.classList.remove("closing");
+  }, 180);
+}
+
+async function enviarConvite(event) {
+  event.preventDefault();
+  if (!selectedCampaignId || !user) {
+    toast("Erro ao enviar convite.", "danger");
+    return;
+  }
+  const emailOrUsername = $("#inviteEmail").value.trim();
+  const papel = $("#invitePapel").value;
+  if (!emailOrUsername) {
+    toast("Digite o email ou username.", "danger");
+    return;
+  }
+  try {
+    setLoading(true);
+    const loginData = getAuthLoginId(emailOrUsername);
+    if (!loginData) return;
+    const { data: userData, error: userError } = await db.auth.admin.getUserById(loginData.email);
+    let targetUserId = userData?.id;
+    if (userError || !targetUserId) {
+      const userSearchRes = await db
+        .from("auth.users")
+        .select("id")
+        .eq("email", loginData.email)
+        .maybeSingle();
+      targetUserId = userSearchRes?.data?.id;
+    }
+    if (!targetUserId) {
+      toast("Usuário não encontrado. Certifique-se de que está registrado.", "danger");
+      return;
+    }
+    const { error } = await db
+      .from("campanha_membros")
+      .insert({
+        campanha_id: selectedCampaignId,
+        user_id: targetUserId,
+        papel,
+        status: "ativo"
+      });
+    if (error) {
+      if (error.code === "23505") {
+        toast("Este usuário já é membro da campanha.", "warning");
+      } else {
+        console.error("[convite] erro:", error);
+        toast("Erro ao enviar convite.", "danger");
+      }
+      return;
+    }
+    toast(`Convite enviado para ${emailOrUsername}.`);
+    fecharModalConvite();
+    await carregarCampanhas();
+  } catch (error) {
+    console.error("[convite] erro inesperado:", error);
+    toast("Erro ao enviar convite.", "danger");
+  } finally {
+    setLoading(false);
+  }
+}
+
+function abrirCampanha(campaignId) {
+  if (!campaignId) return;
+  const url = new URL(window.location);
+  url.searchParams.set("campaignId", campaignId);
+  window.history.pushState(null, "", url.toString());
+  selectedCampaignId = campaignId;
+  showCampaignsPanel = false;
+  const library = $("#arcaneLibrary");
+  const campaigns = $("#campaignsSection");
+  if (library) library.classList.remove("hidden");
+  if (campaigns) campaigns.classList.add("hidden");
+  carregarBiblioteca();
+  toast("Campanha carregada.");
 }
 
 window.salvarFicha = salvarFicha;

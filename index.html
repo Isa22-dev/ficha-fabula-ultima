@@ -55,8 +55,17 @@
               <p class="eyebrow">Acervo de fichas</p>
               <h2>Biblioteca de Fichas</h2>
               <p>Escolha uma ficha para acessar seus dados</p>
+              <div class="campaign-selector hidden" id="campaignSelector">
+                <span class="campaign-label">Mesa:</span>
+                <select id="campaignSelect">
+                  <option value="">Todas as fichas</option>
+                </select>
+              </div>
             </div>
-            <button class="primary-button" type="button" id="newBookBtn"><i class="ti ti-file-plus"></i>Nova Ficha</button>
+            <div class="library-header-buttons">
+              <button class="primary-button" type="button" id="campaignsPanelBtn" title="Gerenciar campanhas"><i class="ti ti-users-group"></i>Campanhas</button>
+              <button class="primary-button" type="button" id="newBookBtn"><i class="ti ti-file-plus"></i>Nova Ficha</button>
+            </div>
           </header>
 
           <div class="selection-action-bar hidden" id="selectionActionBar" aria-live="polite">
@@ -103,6 +112,18 @@
               </div>
             </aside>
           </div>
+        </section>
+
+        <section class="campaigns-section hidden" id="campaignsSection">
+          <header class="library-header">
+            <div>
+              <p class="eyebrow">Gerenciamento de mesas</p>
+              <h2>Campanhas e mesas</h2>
+              <p>Crie ou gerencie suas campanhas</p>
+            </div>
+            <button class="primary-button" type="button" id="newCampaignBtn"><i class="ti ti-plus"></i>Nova Campanha</button>
+          </header>
+          <div class="campaigns-grid" id="campaignsGrid"></div>
         </section>
 
         <section class="empty-state hidden" id="emptyState">
@@ -308,6 +329,39 @@
           <button class="ghost-button" type="button" id="cancelClearHistoryBtn">Cancelar</button>
           <button class="danger-button" type="button" id="confirmClearHistoryBtn">Limpar</button>
         </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop hidden" id="campaignModal" role="dialog" aria-modal="true" aria-labelledby="campaignModalTitle">
+      <div class="campaign-modal">
+        <h2 id="campaignModalTitle">Nova Campanha</h2>
+        <form id="campaignForm" class="campaign-form">
+          <label>Nome da Campanha<input type="text" id="campaignName" placeholder="Nome da mesa ou aventura" required /></label>
+          <label>Descrição<textarea id="campaignDescription" placeholder="Contexto, trama e outras informações..."></textarea></label>
+          <div class="modal-actions">
+            <button class="ghost-button" type="button" id="cancelCampaignBtn">Cancelar</button>
+            <button class="primary-button" type="submit" id="saveCampaignBtn">Criar Campanha</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop hidden" id="inviteModal" role="dialog" aria-modal="true" aria-labelledby="inviteModalTitle">
+      <div class="campaign-modal">
+        <h2 id="inviteModalTitle">Convidar Jogadores</h2>
+        <form id="inviteForm" class="campaign-form">
+          <label>Email ou Username<input type="text" id="inviteEmail" placeholder="Email ou username do jogador" required /></label>
+          <label>Papel
+            <select id="invitePapel" required>
+              <option value="jogador">Jogador</option>
+              <option value="observador">Observador</option>
+            </select>
+          </label>
+          <div class="modal-actions">
+            <button class="ghost-button" type="button" id="cancelInviteBtn">Cancelar</button>
+            <button class="primary-button" type="submit" id="sendInviteBtn">Enviar Convite</button>
+          </div>
+        </form>
       </div>
     </div>
     <!-- Botão Flutuante de Sessão -->
