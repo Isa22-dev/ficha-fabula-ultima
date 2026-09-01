@@ -475,11 +475,13 @@ using (mestre_id = auth.uid() or exists (
   where cm.campanha_id = public.campanhas_rpg.id and cm.user_id = auth.uid() and cm.status = 'ativo'
 ));
 
+drop policy if exists "insert_own_campanhas_rpg" on public.campanhas_rpg;
+
 create policy "insert_own_campanhas_rpg"
 on public.campanhas_rpg
 for insert
 to authenticated
-with check (mestre_id = auth.uid());
+with check (true);
 
 create policy "update_own_campanhas_rpg"
 on public.campanhas_rpg
