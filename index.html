@@ -364,6 +364,20 @@
         </form>
       </div>
     </div>
+
+    <div class="modal-backdrop hidden" id="editCampaignModal" role="dialog" aria-modal="true" aria-labelledby="editCampaignModalTitle">
+      <div class="campaign-modal">
+        <h2 id="editCampaignModalTitle">Editar Campanha</h2>
+        <form id="editCampaignForm" class="campaign-form">
+          <label>Nome da Campanha<input type="text" id="editCampaignName" placeholder="Nome da mesa ou aventura" required /></label>
+          <label>Descrição<textarea id="editCampaignDescription" placeholder="Contexto, trama e outras informações..."></textarea></label>
+          <div class="modal-actions">
+            <button class="ghost-button" type="button" id="cancelEditCampaignBtn">Cancelar</button>
+            <button class="primary-button" type="submit" id="saveEditCampaignBtn">Salvar Alterações</button>
+          </div>
+        </form>
+      </div>
+    </div>
     <!-- Botão Flutuante de Sessão -->
     <button class="session-float-button" id="sessionFloatBtn" title="Abrir painel de sessão">
       <i class="ti ti-notes"></i>

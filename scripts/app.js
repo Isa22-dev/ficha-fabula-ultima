@@ -343,6 +343,8 @@ function bindEvents() {
   $("#cancelCampaignBtn")?.addEventListener("click", fecharModalCampanha);
   $("#inviteForm")?.addEventListener("submit", enviarConvite);
   $("#cancelInviteBtn")?.addEventListener("click", fecharModalConvite);
+  $("#editCampaignForm")?.addEventListener("submit", salvarAlteracoesCampanha);
+  $("#cancelEditCampaignBtn")?.addEventListener("click", fecharModalEditarCampanha);
 
   document.addEventListener("click", (event) => {
     const remove = event.target.closest("[data-remove]");
@@ -2327,6 +2329,8 @@ function renderCampaigns() {
         <div class="campaign-footer">
           <span class="campaign-role">${isMestre ? "Mestre" : "Jogador"}</span>
           <div class="campaign-actions">
+            ${isMestre ? `<button class="ghost-button" type="button" data-edit-campaign="${campaign.id}" title="Editar campanha"><i class="ti ti-edit"></i></button>` : ""}
+            ${isMestre ? `<button class="ghost-button" type="button" data-delete-campaign="${campaign.id}" title="Deletar campanha"><i class="ti ti-trash"></i></button>` : ""}
             ${isMestre ? `<button class="ghost-button" type="button" data-invite-campaign="${campaign.id}" title="Convidar jogadores"><i class="ti ti-users-plus"></i></button>` : ""}
             <button class="primary-button" type="button" data-join-campaign="${campaign.id}" title="Abrir campanha">
               <i class="ti ti-door-enter"></i>Abrir
@@ -2338,6 +2342,20 @@ function renderCampaigns() {
   }).join("");
   
   atualizarSeletorCampanha();
+  
+  document.querySelectorAll("[data-edit-campaign]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const campaignId = e.currentTarget.dataset.editCampaign;
+      abrirModalEditarCampanha(campaignId);
+    });
+  });
+
+  document.querySelectorAll("[data-delete-campaign]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const campaignId = e.currentTarget.dataset.deleteCampaign;
+      deletarCampanha(campaignId);
+    });
+  });
   
   document.querySelectorAll("[data-invite-campaign]").forEach(btn => {
     btn.addEventListener("click", (e) => {
@@ -2491,6 +2509,103 @@ function fecharModalConvite() {
     modal.classList.add("hidden");
     modal.classList.remove("closing");
   }, 180);
+}
+
+function abrirModalEditarCampanha(campaignId) {
+  const campaign = campaignList.find(c => c.id === campaignId);
+  if (!campaign || !(campaign.is_mestre || campaign.papel === "mestre")) {
+    toast("Você não tem permissão para editar esta campanha.", "danger");
+    return;
+  }
+  currentEditingCampaignId = campaignId;
+  const form = $("#editCampaignForm");
+  if (!form) return;
+  $("#editCampaignName").value = campaign.nome || "";
+  $("#editCampaignDescription").value = campaign.descricao || "";
+  const modal = $("#editCampaignModal");
+  if (!modal) return;
+  modal.classList.remove("hidden", "closing");
+  $("#editCampaignName").focus();
+}
+
+function fecharModalEditarCampanha() {
+  const modal = $("#editCampaignModal");
+  if (!modal) return;
+  modal.classList.add("closing");
+  setTimeout(() => {
+    modal.classList.add("hidden");
+    modal.classList.remove("closing");
+  }, 180);
+}
+
+async function salvarAlteracoesCampanha(event) {
+  event.preventDefault();
+  if (!currentEditingCampaignId || !user) {
+    toast("Erro ao salvar campanha.", "danger");
+    return;
+  }
+  const nome = $("#editCampaignName").value.trim();
+  const descricao = $("#editCampaignDescription").value.trim();
+  if (!nome) {
+    toast("O nome da campanha é obrigatório.", "danger");
+    return;
+  }
+  try {
+    setLoading(true);
+    const { error } = await db
+      .from("campanhas_rpg")
+      .update({
+        nome,
+        descricao,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", currentEditingCampaignId)
+      .eq("mestre_id", user.id);
+    if (error) {
+      console.error("[salvar campanha] erro:", error);
+      toast("Erro ao salvar campanha.", "danger");
+      return;
+    }
+    toast("Campanha atualizada com sucesso!");
+    fecharModalEditarCampanha();
+    await carregarCampanhas();
+  } catch (error) {
+    console.error("[salvar campanha] erro inesperado:", error);
+    toast("Erro ao salvar campanha.", "danger");
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function deletarCampanha(campaignId) {
+  const campaign = campaignList.find(c => c.id === campaignId);
+  if (!campaign || !(campaign.is_mestre || campaign.papel === "mestre")) {
+    toast("Você não tem permissão para deletar esta campanha.", "danger");
+    return;
+  }
+  if (!confirm(`Tem certeza que deseja deletar a campanha "${campaign.nome}"? Esta ação não pode ser desfeita.`)) {
+    return;
+  }
+  try {
+    setLoading(true);
+    const { error } = await db
+      .from("campanhas_rpg")
+      .delete()
+      .eq("id", campaignId)
+      .eq("mestre_id", user.id);
+    if (error) {
+      console.error("[deletar campanha] erro:", error);
+      toast("Erro ao deletar campanha.", "danger");
+      return;
+    }
+    toast("Campanha deletada com sucesso!");
+    await carregarCampanhas();
+  } catch (error) {
+    console.error("[deletar campanha] erro inesperado:", error);
+    toast("Erro ao deletar campanha.", "danger");
+  } finally {
+    setLoading(false);
+  }
 }
 
 async function enviarConvite(event) {
