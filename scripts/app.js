@@ -1268,10 +1268,10 @@ async function listarFichas() {
     }
 
     if (error || !rows.length) {
-      console.warn("[biblioteca] RPC falhou ou retornou vazio; carregando todas as fichas diretamente do banco para o painel e biblioteca:", error);
-      const fallback = await db.from("fichas_rpg").select("*").order("updated_at", { ascending: false });
+      console.warn("[biblioteca] RPC falhou ou retornou vazio; carregando fichas do usuário diretamente do banco:", error);
+      const fallback = await db.from("fichas_rpg").select("*").eq("user_id", user.id).order("updated_at", { ascending: false });
       rows = Array.isArray(fallback?.data) ? fallback.data : [];
-      console.log("[biblioteca] fallback direct select:", { data: rows, error: fallback?.error });
+      console.log("[biblioteca] fallback direct select (user_id only):", { data: rows, error: fallback?.error, userId: user.id });
       if (fallback?.error) {
         throw fallback.error;
       }
