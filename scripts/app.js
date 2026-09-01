@@ -1240,7 +1240,7 @@ async function listarFichas() {
     console.log("[diagnostico] Supabase select fichas da mesa resposta:", { data: rows, error });
 
     if (error || !rows.length) {
-      console.warn("[biblioteca] RPC falhou ou retornou vazio; usando fallback direto ao banco para preservar fichas antigas:", error);
+      console.warn("[biblioteca] RPC falhou ou retornou vazio; carregando todas as fichas diretamente do banco para o painel e biblioteca:", error);
       const fallback = await db.from("fichas_rpg").select("*").order("updated_at", { ascending: false });
       rows = Array.isArray(fallback?.data) ? fallback.data : [];
       console.log("[biblioteca] fallback direct select:", { data: rows, error: fallback?.error });
@@ -1249,13 +1249,16 @@ async function listarFichas() {
       }
     }
 
-    sheetList = filtrarFichasPersistidas(rows);
-    if (!sheetList.length) {
+    if (!rows.length) {
+      sheetList = [];
       renderizarLivros([]);
       renderPlayersResourcePanel();
       if (!state?.id) clearActiveSheet();
       return sheetList;
     }
+
+    sheetList = filtrarFichasPersistidas(rows);
+    console.log("[painel] total de fichas persistidas carregadas:", sheetList.length, sheetList);
     renderizarLivros(sheetList);
     renderPlayersResourcePanel();
     updateWorkspaceState();
@@ -1526,13 +1529,16 @@ function renderPlayersResourcePanel() {
     list.innerHTML = '<div class="players-empty">Entre para ver os recursos da mesa.</div>';
     return;
   }
+
   console.log("[painel] usuário atual:", user?.id);
   const fichas = filtrarFichasPersistidas(sheetList);
-  console.log("[painel] fichas carregadas:", fichas.length, fichas);
+  console.log("[painel] fichas carregadas para render:", fichas.length, fichas);
+
   if (!fichas.length) {
     list.innerHTML = '<div class="players-empty">Nenhuma ficha cadastrada na mesa.</div>';
     return;
   }
+
   list.innerHTML = fichas.map((ficha) => {
     const resumo = resumoFicha(ficha);
     const isOwner = isFichaDoUsuario(ficha);
