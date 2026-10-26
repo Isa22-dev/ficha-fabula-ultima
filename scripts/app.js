@@ -64,6 +64,7 @@ let schemaWarningShown = false;
 let isSaving = false;
 let pendingSave = false;
 let sheetList = [];
+let visibleSheetList = [];
 let deleteModalOpen = false;
 let pendingDeleteId = null;
 let pendingDeleteIds = [];
@@ -1307,6 +1308,9 @@ async function listarFichasSupabase() {
 async function renderizarLivros(fichas) {
   const grid = $("#bookGrid");
   if (!grid) return;
+  // A biblioteca inicial mostra somente as fichas do usuário. As fichas dos
+  // demais jogadores continuam em sheetList para alimentar o painel de recursos.
+  fichas = (fichas || []).filter((ficha) => isFichaDoUsuario(ficha));
   if (!fichas.length) {
     limparSelecaoBiblioteca(false);
     mostrarEstadoVazio();
@@ -1347,7 +1351,7 @@ async function renderizarLivros(fichas) {
       </article>
     `;
   }).join("");
-  const selected = sheetList.find((ficha) => ficha.id === selectedLibraryId) || sheetList[0];
+  const selected = fichas.find((ficha) => ficha.id === selectedLibraryId) || fichas[0];
   if (!selectedLibraryId && selected) selectedLibraryId = selected.id;
   fichaSelecionada = selected || null;
   preencherPainelLeitura(selected);
